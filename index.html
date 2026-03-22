@@ -47,7 +47,7 @@ input:focus,textarea:focus{outline:none}
 body.light .drawer{background:#fff;box-shadow:-8px 0 40px rgba(100,130,200,.2)}
 @keyframes drawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
 .page{min-height:100vh;background:#090D18}
-/* Light theme */
+
 body.light{background:#EEF2FB;color:#1A2035}
 body.light .hdr{background:#fff;border-bottom-color:#DDE6F8}
 body.light .inp{background:#F0F4FC;color:#1A2035;border-color:#C8D8F0}
@@ -75,9 +75,7 @@ document.head.appendChild(link);
 <div id="app"></div>
 
 <script>
-/* ══════════════════════════════════════
-   CONSTANTS & HELPERS
-══════════════════════════════════════ */
+
 var GRM=["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
 var HJM=["محرم","صفر","ربيع الأول","ربيع الثاني","جمادى الأولى","جمادى الآخرة","رجب","شعبان","رمضان","شوال","ذو القعدة","ذو الحجة"];
 var ARD=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
@@ -158,7 +156,6 @@ function cvt(amt,from,rates){
   return{usd:usd.toFixed(4),try:(usd*tryR).toFixed(2),syp:Math.round(usd*sypR).toString()};
 }
 
-/* Safe math */
 function safeMath(raw){
   var s=raw.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').trim();
   if(!s)return null; var i=0;
@@ -170,9 +167,6 @@ function safeMath(raw){
   try{var r=E();return isFinite(r)?parseFloat(r.toFixed(10)):null;}catch(e){return null;}
 }
 
-/* ══════════════════════════════════════
-   STORAGE: localStorage + IndexedDB backup
-══════════════════════════════════════ */
 var _IDB=null,_IDB_KEYS=['hb_expenses','hb_rates','hb_sticky','hb_spender','hb_rate_ts','hb_income','hb_debts','hb_sync_id','hb_sync_code','hb_dhikr_ts','hb_dhikr_idx','hb_uid','hb_auto_blob'];
 function _openIDB(cb){
   if(_IDB){cb(_IDB);return;}
@@ -224,7 +218,6 @@ function lsSet(key,val){
   idbSet(key,val);// نسخة احتياطية في IndexedDB
 }
 
-/* تسجيل Service Worker للعمل بدون انترنت */
 function _registerSW(){
   if(!('serviceWorker' in navigator))return;
   var appUrl=location.href.split('?')[0].split('#')[0];
@@ -267,9 +260,6 @@ function _registerSW(){
 }
 window.addEventListener('load',function(){setTimeout(_registerSW,2000);});
 
-/* ══════════════════════════════════════
-   STATE
-══════════════════════════════════════ */
 var STATE={
   view:'loading',
   selMonth:null,
@@ -289,10 +279,6 @@ var STATE={
   calcExpr:'',calcResult:'',calcOpen:false,debtsOpen:false,showMonths:false,debtConfirmId:null,debtConfirmType:null,drawerOpen:false,
 };
 
-
-/* ══════════════════════════════════════
-   SYNC ENGINE (jsonblob.com)
-══════════════════════════════════════ */
 var SYNC={
   blobId: null,    // full blob ID
   code:   null,    // 8-char share code shown to user
@@ -304,9 +290,6 @@ var SYNC={
 var BLOB_API='https://jsonblob.com/api/jsonBlob';
 var NPOINT_API='https://api.npoint.io';
 
-/* ══════════════════════════════════════
-   ADMIN SYSTEM + USER ID
-══════════════════════════════════════ */
 // ⚠️ غيّر هذه الكلمة السرية — الأدمن فقط يعرفها
 var ADMIN_KEY='770389';
 var WA_NUM='963968688718';// رقم الواتساب الدولي
@@ -518,9 +501,6 @@ function saveExpenses(){lsSet('hb_expenses',JSON.stringify(STATE.expenses));if(S
 function saveDebts(){lsSet('hb_debts',JSON.stringify(STATE.debts));if(SYNC&&SYNC.blobId)syncPush();autoSyncPush();}
 function saveRates(){lsSet('hb_rates',JSON.stringify(STATE.rates));if(SYNC&&SYNC.blobId)syncPush();}
 
-/* ══════════════════════════════════════
-   RENDER ENGINE
-══════════════════════════════════════ */
 function render(){
   var app=document.getElementById('app');
   switch(STATE.view){
@@ -538,9 +518,6 @@ function render(){
   if(app)app.scrollTop=0;
 }
 
-/* ══════════════════════════════════════
-   LOADING
-══════════════════════════════════════ */
 function renderLoading(){
   return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:'+TB.appBg+'">'+
     '<div style="font-size:52px;margin-bottom:16px">🏡</div>'+
@@ -550,244 +527,175 @@ function renderLoading(){
     '<div style="width:60%;height:100%;background:'+TB.blue+';border-radius:99px;animation:loadBar 1.2s ease-in-out infinite"></div></div></div>';
 }
 
-/* ══════════════════════════════════════
-   HEADER
-══════════════════════════════════════ */
 function renderHeader(showBack,isRam){
-  var title=STATE.spender?'مصروف '+STATE.spender:'مصروف البيت';
+  var title=isRam?'رمضان المبارك':'مصروف البيت';
   var hdrBg=isRam?(IS_DAY?'#FFF8E8':TB.hdrBg):TB.hdrBg;
-  var hdrBdr=isRam?GOLD_BDR:TB.border;
-  return '<div class="hdr" style="background:'+hdrBg+';border-bottom-color:'+hdrBdr+'">'+
+  return '<div class="hdr" style="background:'+hdrBg+'">'+
     '<div style="display:flex;align-items:center;gap:8px">'+
-    (showBack?'<button onclick="goBack()" style="background:transparent;border:1px solid '+TB.border2+';color:'+TB.textSub+';border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700">← رجوع</button>':'')+
-    '<div style="flex:1">'+
-    '<div style="display:flex;align-items:center;gap:5px">'+
-    '<span style="font-weight:900;font-size:16px;color:'+(isRam?GOLD:TB.blue)+'">'+title+'</span>'+
-    (isRam?'<span class="moon-pulse" style="font-size:14px">🌙</span>':'')+
-    '</div>'+
-    '<div style="font-size:12px;color:'+(IS_DAY?'#E67E22':'#FBB924')+';font-weight:900;margin-top:1px">'+greeting()+'</div>'+
+    (showBack?'<button onclick="goBack()" style="background:transparent;border:1px solid '+TB.border2+';color:'+TB.textSub+';border-radius:8px;padding:5px 10px;font-size:13px;font-weight:700">← رجوع</button>':'')+
+    '<div style="flex:1"><span style="font-weight:900;font-size:17px;color:'+(isRam?GOLD:TB.blue)+'">'+title+'</span>'+
+    (isRam?'<span class="moon-pulse" style="font-size:15px;margin-right:5px">🌙</span>':'')+
     '</div>'+
     '<button onclick="openModal(\'rates\')" style="background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);color:#FBB924;border-radius:9px;padding:5px 8px;font-size:10px;font-weight:700;text-align:center;line-height:1.4">💱<br><span style="font-size:9px">'+STATE.rates.try+'₺</span></button>'+
-    '<button onclick="openModal(\'sync\')" style="position:relative;background:transparent;border:1px solid '+(SYNC.blobId?'rgba(74,222,128,.4)':TB.border2)+';border-radius:9px;padding:7px 9px;font-size:16px">🔗<div style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:'+(SYNC.blobId?'#4ADE80':'#566078')+'"></div></button>'+
-    '<button onclick="openDrawer()" style="background:'+(IS_DAY?'rgba(79,142,247,.1)':'rgba(79,142,247,.15)')+';border:1px solid rgba(79,142,247,.3);color:'+TB.blue+';border-radius:9px;padding:7px 10px;font-size:18px;line-height:1" title="الإعدادات">⚙️</button>'+
-    '<button onclick="openModal(\'add\')" style="background:'+(isRam?'linear-gradient(135deg,'+GOLD+',#C8810A)':'linear-gradient(135deg,'+TB.blue+','+TB.blueDim+')')+';color:'+(isRam?'#000':'#fff')+';border:none;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:900">+ مصروف</button>'+
+    '<button onclick="openDrawer()" style="background:'+(IS_DAY?'rgba(79,142,247,.1)':'rgba(79,142,247,.15)')+';border:1px solid rgba(79,142,247,.3);color:'+TB.blue+';border-radius:9px;padding:7px 10px;font-size:18px">⚙️</button>'+
     '</div></div>';
 }
 
-/* ══════════════════════════════════════
-   MONTHS VIEW
-══════════════════════════════════════ */
 function renderMonths(){
   var allExp=Object.values(STATE.expenses).flat();
   var spentUsd=sumC(allExp,'usd');
   var hasIncome=n(STATE.income.try)>0||n(STATE.income.usd)>0||n(STATE.income.syp)>0;
-  var remUsd=hasIncome?n(STATE.income.usd)-spentUsd:null;
   var pctUsed=hasIncome&&n(STATE.income.usd)>0?Math.min(100,Math.round(spentUsd/n(STATE.income.usd)*100)):0;
   var barColor=pctUsed>85?'#EF5350':pctUsed>60?'#FBB924':'#4ADE80';
-  var todayHj=toHijri(CY,CM+1,CD);
-  var isRamToday=isRamDay(CM,CD),rNumToday=ramDayNum(CM,CD);
+  var isRamNow=isRamDay(CM,CD);
+  var rNumNow=ramDayNum(CM,CD);
   var todayItems=(STATE.expenses[TODAY_KEY]||[]).length;
-
-  var html='<div class="page" style="background:'+TB.appBg+'">'+renderHeader(false,false);
-
-  // ── تحية + تاريخ ──
-  html+='<div onclick="adminTap()" style="padding:10px 14px 0;display:flex;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent">';
-  html+='<span style="font-size:26px">'+(CH>=7&&CH<12?'🌤️':CH>=12&&CH<20?'🌇':'🌙')+'</span>';
-  html+='<div>';
-  html+='<div style="font-weight:900;font-size:18px;color:'+(IS_DAY?'#1A2035':'#E4EDF8')+'">'+(CH>=7&&CH<12?'صباح الخير':'مساء الخير')+(STATE.spender?' يا '+STATE.spender:'')+'</div>';
-  html+='<div style="font-size:12px;color:'+TB.textMuted+'">'+ARD[NOW.getDay()]+' '+CD+' '+GRM[CM]+' '+CY+' م</div>';
-  html+='</div></div>';
-
-  // adminTap منقول للتحية
-
-  // زر 1: مصروف جديد
-  var isRamNow=isRamToday;
-  html+='<button onclick="openModal(\'add\')" style="'+
-    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;'+
-    'padding:20px 10px;'+
-    'background:'+(isRamNow?'linear-gradient(135deg,'+GOLD+',#C8810A)':'linear-gradient(135deg,'+TB.blue+','+TB.blueDim+')')+';'+
-    'color:'+(isRamNow?'#000':'#fff')+';'+
-    'border:none;border-radius:18px;'+
-    'font-family:\'Cairo\',\'Tahoma\',sans-serif;'+
-    'box-shadow:0 6px 20px '+(isRamNow?'rgba(245,166,35,.4)':'rgba(79,142,247,.4)')+';'+
-    'cursor:pointer;transition:transform .15s;-webkit-tap-highlight-color:transparent">'+
-    '<span style="font-size:32px">➕</span>'+
-    '<span style="font-weight:900;font-size:16px">مصروف جديد</span>'+
-    '<span style="font-size:11px;opacity:.85">'+(todayItems>0?todayItems+' مادة اليوم':'سجّل مصروفك')+'</span>'+
-    '</button>';
-
-  // زر 2: أشهر السنة
-  var ramCount=RAM_DAYS.filter(function(r){return(STATE.expenses[dk(r.month,r.day)]||[]).length>0;}).length;
-  html+='<button onclick="goDays('+CM+')" style="'+
-    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;'+
-    'padding:20px 10px;'+
-    'background:'+(IS_DAY?'#fff':'#0F1525')+';'+
-    'color:'+TB.text+';'+
-    'border:2px solid '+TB.border+';border-radius:18px;'+
-    'font-family:\'Cairo\',\'Tahoma\',sans-serif;'+
-    'box-shadow:0 4px 16px '+TB.shadow+';'+
-    'cursor:pointer;-webkit-tap-highlight-color:transparent">'+
-    '<span style="font-size:32px">📅</span>'+
-    '<span style="font-weight:900;font-size:16px;color:'+TB.text+'">'+GRM[CM]+'</span>'+
-    '<span style="font-size:11px;color:'+TB.textMuted+'">الشهر الحالي</span>'+
-    '</button>';
-
-  html+='</div>';
-
-  // ── بطاقة الميزانية إن وجدت ──
-  if(hasIncome){
-    html+='<div style="margin:10px 12px 0;background:'+TB.cardBg+';border:1px solid '+TB.border+';border-radius:14px;padding:12px 14px">';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-    html+='<div style="font-weight:900;font-size:13px;color:'+TB.blue+'">💰 ميزانية الشهر</div>';
-    html+='<div onclick="openModal(\'session\')" style="cursor:pointer;display:flex;align-items:center;gap:4px;background:'+(todayItems>0?'rgba(74,222,128,.12)':'rgba(79,142,247,.07)')+';border:1px solid '+(todayItems>0?'rgba(74,222,128,.35)':'rgba(79,142,247,.2)')+';border-radius:20px;padding:4px 9px">';
-    html+='<span style="font-size:13px">🗒️</span>';
-    html+='<span style="font-size:10px;font-weight:700;color:'+(todayItems>0?'#4ADE80':TB.textMuted)+'">'+(todayItems>0?todayItems+' اشتريت اليوم':'اشتريت اليوم')+'</span>';
-    html+='</div></div>';
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">';
-    if(n(STATE.income.usd)>0){
-      html+='<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">';
-      html+='<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">$ المتبقي</div>';
-      html+='<div style="font-weight:900;font-size:16px;color:'+(remUsd<0?'#EF5350':'#4ADE80')+'">'+fmt(remUsd)+'</div>';
-      html+='<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.usd))+'</div></div>';
-    }
-    if(n(STATE.income.try)>0){
-      var remTry=n(STATE.income.try)-sumC(allExp,'try');
-      html+='<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">';
-      html+='<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">₺ المتبقي</div>';
-      html+='<div style="font-weight:900;font-size:16px;color:'+(remTry<0?'#EF5350':'#4ADE80')+'">'+fmt(remTry)+'</div>';
-      html+='<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.try))+'</div></div>';
-    }
-    if(n(STATE.income.syp)>0){
-      var remSyp=n(STATE.income.syp)-sumC(allExp,'syp');
-      html+='<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">';
-      html+='<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">ل.س المتبقي</div>';
-      html+='<div style="font-weight:900;font-size:16px;color:'+(remSyp<0?'#EF5350':'#4ADE80')+'">'+fmt(remSyp)+'</div>';
-      html+='<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.syp))+'</div></div>';
-    }
-    html+='</div>';
-    html+='<div style="background:'+TB.border+';border-radius:99px;height:5px;overflow:hidden">';
-    html+='<div style="height:100%;width:'+pctUsed+'%;background:'+barColor+';border-radius:99px;transition:width .3s"></div></div>';
-    html+='</div>';
-  } else {
-    // بدون ميزانية: زر اشتريت اليوم
-    html+='<div onclick="openModal(\'session\')" style="margin:10px 12px 0;cursor:pointer;display:flex;align-items:center;gap:10px;background:'+(todayItems>0?'rgba(74,222,128,.08)':TB.cardBg)+';border:1px solid '+(todayItems>0?'rgba(74,222,128,.3)':TB.border)+';border-radius:13px;padding:11px 14px">';
-    html+='<span style="font-size:22px">🗒️</span>';
-    html+='<div style="flex:1">';
-    html+='<div style="font-weight:900;font-size:13px;color:'+(todayItems>0?'#4ADE80':TB.textSub)+'">اشتريت اليوم</div>';
-    html+='<div style="font-size:11px;color:'+TB.textMuted+'">'+(todayItems>0?todayItems+' مادة مسجلة':'لا يوجد تسجيل اليوم')+'</div>';
-    html+='</div></div>';
-  }
-
-  // ── بطاقة ديوني ──
   var unpaidDebts=STATE.debts.filter(function(d){return !d.paid;});
   var dc=unpaidDebts.length;
   var totalDebtUsd=unpaidDebts.reduce(function(s,d){return s+n(d.usd);},0);
-  var dOpen=STATE.debtsOpen;
-  html+='<div style="margin:10px 12px 0;background:'+TB.cardBg+';border:2px solid rgba(251,146,60,.35);border-radius:15px;overflow:hidden">';
-  html+='<div onclick="STATE.debtsOpen=!STATE.debtsOpen;render()" style="cursor:pointer;background:rgba(251,146,60,.08);padding:11px 14px;display:flex;align-items:center;justify-content:space-between">';
-  html+='<div style="display:flex;align-items:center;gap:8px">';
-  html+='<span style="font-size:22px">📋</span>';
+  var ramTotUsd=0;
+  RAM_DAYS.forEach(function(r){(STATE.expenses[dk(r.month,r.day)]||[]).forEach(function(e){ramTotUsd+=n(e.usd);});});
+  var btnAddBg=isRamNow?'linear-gradient(135deg,'+GOLD+',#C8810A)':'linear-gradient(135deg,'+TB.blue+','+TB.blueDim+')';
+  var btnAddClr=isRamNow?'#000':'#fff';
+
+  var html='<div class="page" style="background:'+TB.appBg+'">'+renderHeader(false,false);
+  html+='<div style="padding:10px 12px 90px">';
+
+  // ── تحية ──
+  html+='<div onclick="adminTap()" style="margin-bottom:10px;padding:12px 14px;background:'+TB.cardBg+';border:1px solid '+TB.border+';border-radius:14px;display:flex;align-items:center;justify-content:space-between;-webkit-tap-highlight-color:transparent;cursor:pointer">';
+  html+='<div style="display:flex;align-items:center;gap:10px">';
+  html+='<span style="font-size:26px">'+(CH>=7&&CH<12?'🌤️':CH>=12&&CH<20?'🌇':'🌙')+'</span>';
   html+='<div>';
-  html+='<div style="font-weight:900;font-size:14px;color:#FB923C">ديوني</div>';
-  html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+(dc>0?dc+' دين غير مسدّد':'لا ديون معلّقة')+'</div>';
+  html+='<div style="font-weight:900;font-size:16px;color:'+TB.text+'">'+(CH>=7&&CH<12?'صباح الخير':'مساء الخير')+(STATE.spender?' يا '+STATE.spender:'')+'</div>';
+  html+='<div style="font-size:11px;color:'+TB.textMuted+'">'+ARD[NOW.getDay()]+' '+CD+' '+GRM[CM]+' '+CY+'</div>';
   html+='</div></div>';
+  html+='<div style="text-align:center">';
+  html+='<div style="font-size:32px;font-weight:900;color:'+(isRamNow?GOLD:TB.blue)+';line-height:1.1">'+CD+'</div>';
+  html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+GRM[CM]+'</div>';
+  if(isRamNow)html+='<div style="font-size:9px;color:'+GOLD+';font-weight:700">🌙'+rNumNow+'</div>';
+  html+='</div></div>';
+
+  // ── الزران جنباً لجنب (flex) ──
+  html+='<div style="margin-bottom:10px;display:flex;flex-direction:row;gap:10px">';
+  html+='<button onclick="openModal(\'add\')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:0;height:130px;background:'+btnAddBg+';color:'+btnAddClr+';border:0 none;border-radius:16px;-webkit-tap-highlight-color:transparent;cursor:pointer">';
+  html+='<span style="font-size:28px">➕</span>';
+  html+='<span style="font-weight:900;font-size:15px">'+(isRamNow?'مصروف رمضان':'مصروف جديد')+'</span>';
+  html+='<span style="font-size:10px;opacity:.85">'+(todayItems>0?todayItems+' مادة اليوم':'سجّل مصروفك')+'</span>';
+  html+='</button>';
+  html+='<button onclick="goDays('+CM+')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:0;height:130px;background:'+(IS_DAY?'#ffffff':'#151C30')+';color:'+TB.text+';border:2px solid '+TB.border+';border-radius:16px;-webkit-tap-highlight-color:transparent;cursor:pointer">';
+  html+='<span style="font-size:28px">📅</span>';
+  html+='<span style="font-weight:900;font-size:15px;color:'+TB.text+'">'+GRM[CM]+'</span>';
+  html+='<span style="font-size:10px;color:'+TB.textMuted+'">الشهر الحالي</span>';
+  html+='</button>';
+  html+='</div>';
+
+  // ── اشتريت اليوم / ميزانية ──
+  if(hasIncome){
+    var remUsd=n(STATE.income.usd)-spentUsd;
+    var remTry=n(STATE.income.try)-sumC(allExp,'try');
+    var remSyp=n(STATE.income.syp)-sumC(allExp,'syp');
+    html+='<div style="margin-bottom:10px;padding:12px 14px;background:'+TB.cardBg+';border:1px solid '+TB.border+';border-radius:14px">';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    html+='<div style="font-weight:900;font-size:13px;color:'+TB.blue+'">💰 ميزانية الشهر</div>';
+    html+='<div onclick="openModal(\'session\')" style="cursor:pointer;display:flex;align-items:center;gap:4px;background:'+(todayItems>0?'rgba(74,222,128,.12)':'rgba(79,142,247,.07)')+';border:1px solid '+(todayItems>0?'rgba(74,222,128,.35)':'rgba(79,142,247,.2)')+';border-radius:20px;padding:4px 10px">';
+    html+='<span>🗒️</span><span style="font-size:10px;font-weight:700;color:'+(todayItems>0?'#4ADE80':TB.textMuted)+'">اشتريت اليوم'+(todayItems>0?' ('+todayItems+')':'')+'</span>';
+    html+='</div></div>';
+    html+='<div style="display:flex;gap:6px;margin-bottom:8px">';
+    if(n(STATE.income.usd)>0)html+='<div style="flex:1;background:'+TB.inputBg+';border-radius:9px;padding:7px 4px;border:1px solid '+TB.border+';text-align:center"><div style="font-size:9px;color:'+TB.textMuted+'">$ متبقي</div><div style="font-weight:900;font-size:15px;color:'+(remUsd<0?'#EF5350':'#4ADE80')+'">'+fmt(remUsd)+'</div></div>';
+    if(n(STATE.income.try)>0)html+='<div style="flex:1;background:'+TB.inputBg+';border-radius:9px;padding:7px 4px;border:1px solid '+TB.border+';text-align:center"><div style="font-size:9px;color:'+TB.textMuted+'">₺ متبقي</div><div style="font-weight:900;font-size:15px;color:'+(remTry<0?'#EF5350':'#4ADE80')+'">'+fmt(remTry)+'</div></div>';
+    if(n(STATE.income.syp)>0)html+='<div style="flex:1;background:'+TB.inputBg+';border-radius:9px;padding:7px 4px;border:1px solid '+TB.border+';text-align:center"><div style="font-size:9px;color:'+TB.textMuted+'">ل.س متبقي</div><div style="font-weight:900;font-size:14px;color:'+(remSyp<0?'#EF5350':'#4ADE80')+'">'+fmt(remSyp)+'</div></div>';
+    html+='</div>';
+    html+='<div style="background:'+TB.border+';border-radius:99px;height:5px;overflow:hidden"><div style="height:5px;width:'+pctUsed+'%;background:'+barColor+';border-radius:99px"></div></div>';
+    html+='</div>';
+  } else {
+    html+='<div onclick="openModal(\'session\')" style="margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:10px;background:'+(todayItems>0?'rgba(74,222,128,.07)':TB.cardBg)+';border:1px solid '+(todayItems>0?'rgba(74,222,128,.3)':TB.border)+';border-radius:14px;padding:12px 14px">';
+    html+='<span style="font-size:22px">🗒️</span><div>';
+    html+='<div style="font-weight:900;font-size:13px;color:'+(todayItems>0?'#4ADE80':TB.textSub)+'">اشتريت اليوم</div>';
+    html+='<div style="font-size:11px;color:'+TB.textMuted+'">'+(todayItems>0?todayItems+' مادة':'اضغط لتسجيل مصروف اليوم')+'</div>';
+    html+='</div></div>';
+  }
+
+  // ── ديوني ──
+  var dOpen=STATE.debtsOpen;
+  html+='<div style="margin-bottom:10px;background:'+TB.cardBg+';border:2px solid rgba(251,146,60,.35);border-radius:14px;overflow:hidden">';
+  html+='<div onclick="STATE.debtsOpen=!STATE.debtsOpen;render()" style="cursor:pointer;background:rgba(251,146,60,.07);padding:11px 14px;display:flex;align-items:center;justify-content:space-between">';
+  html+='<div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">📋</span>';
+  html+='<div><div style="font-weight:900;font-size:13px;color:#FB923C">ديوني</div>';
+  html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+(dc>0?dc+' دين غير مسدّد':'لا ديون معلّقة')+'</div></div></div>';
   html+='<div style="display:flex;align-items:center;gap:7px">';
-  if(dc>0)html+='<div style="font-size:10px;color:#FB923C;font-weight:700;background:rgba(251,146,60,.12);border-radius:20px;padding:3px 9px">$'+fmt(totalDebtUsd)+'</div>';
-  html+='<span style="font-size:14px;color:#FB923C">'+(dOpen?'▲':'▼')+'</span>';
-  html+='<button onclick="event.stopPropagation();openModal(\'addDebt\')" style="background:linear-gradient(135deg,#FB923C,#EA580C);color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:900">+ دين</button>';
+  if(dc>0)html+='<span style="font-size:10px;color:#FB923C;font-weight:700;background:rgba(251,146,60,.12);border-radius:20px;padding:2px 8px">$'+fmt(totalDebtUsd)+'</span>';
+  html+='<span style="font-size:13px;color:#FB923C">'+(dOpen?'▲':'▼')+'</span>';
+  html+='<button onclick="event.stopPropagation();openModal(\'addDebt\')" style="background:linear-gradient(135deg,#FB923C,#EA580C);color:#fff;border:none;border-radius:9px;padding:6px 11px;font-size:12px;font-weight:900">+ دين</button>';
   html+='</div></div>';
   if(dOpen){
     if(dc>0){
-      html+='<div style="padding:8px 12px 10px;max-height:260px;overflow-y:auto">';
+      html+='<div style="padding:8px 12px 10px;max-height:240px;overflow-y:auto">';
       unpaidDebts.forEach(function(d){
         html+='<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:'+TB.cardBg2+';border:1px solid rgba(251,146,60,.2);border-radius:10px;margin-bottom:6px">';
-        html+='<div style="flex:1"><div style="font-weight:900;font-size:14px;color:'+TB.text+'">'+escHtml(d.name)+'</div>';
-        if(d.note)html+='<div style="font-size:10px;color:'+TB.textMuted+'">🗒 '+escHtml(d.note)+'</div>';
-        html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">';
+        html+='<div style="flex:1"><div style="font-weight:900;font-size:13px;color:'+TB.text+'">'+escHtml(d.name)+'</div>';
+        if(d.note)html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+escHtml(d.note)+'</div>';
+        html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:3px">';
         if(n(d.try)>0)html+='<span style="font-size:10px;color:#EF5350;font-weight:700">₺'+fmt(n(d.try))+'</span>';
         if(n(d.usd)>0)html+='<span style="font-size:10px;color:#66BB6A;font-weight:700">$'+fmt(n(d.usd))+'</span>';
         if(n(d.syp)>0)html+='<span style="font-size:10px;color:#42A5F5;font-weight:700">ل.س'+fmt(n(d.syp))+'</span>';
-        html+='<span style="font-size:9px;color:'+TB.textFaint+'">📅 '+d.date+'</span>';
         html+='</div></div>';
         html+='<div style="display:flex;flex-direction:column;gap:5px">';
-        html+='<button onclick="event.stopPropagation();confirmDebtPaid('+d.id+')" style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.35);color:#4ADE80;border-radius:7px;padding:5px 9px;font-size:10px;font-weight:700;white-space:nowrap">✓ تسديد</button>';
-        html+='<button onclick="event.stopPropagation();confirmDebtDelete('+d.id+')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:#EF5350;border-radius:7px;padding:5px 9px;font-size:10px;font-weight:700">🗑 حذف</button>';
+        html+='<button onclick="event.stopPropagation();confirmDebtPaid('+d.id+')" style="background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.35);color:#4ADE80;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700">✓</button>';
+        html+='<button onclick="event.stopPropagation();confirmDebtDelete('+d.id+')" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:#EF5350;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:700">🗑</button>';
         html+='</div></div>';
       });
       html+='</div>';
     } else {
-      html+='<div style="text-align:center;padding:16px;color:'+TB.textFaint+';font-size:12px">لا ديون مسجّلة 🎉</div>';
+      html+='<div style="text-align:center;padding:14px;color:'+TB.textFaint+';font-size:12px">لا ديون مسجّلة 🎉</div>';
     }
   }
   html+='</div>';
 
-  // ── زر أشهر السنة ──
-  html+='<div style="margin:10px 12px 0">';
-  html+='<button onclick="STATE.showMonths=!STATE.showMonths;render()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:'+TB.cardBg+';border:2px solid '+TB.border+';border-radius:14px;cursor:pointer;font-family:\'Cairo\',\'Tahoma\',sans-serif">';
-  html+='<div style="display:flex;align-items:center;gap:9px">';
-  html+='<span style="font-size:22px">🗓️</span>';
-  html+='<div style="text-align:right">';
-  html+='<div style="font-weight:900;font-size:15px;color:'+TB.text+'">أشهر السنة</div>';
-  html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+CY+' م</div>';
-  html+='</div></div>';
-  html+='<span style="font-size:18px;color:'+TB.textMuted+'">'+(STATE.showMonths?'▲':'▼')+'</span>';
-  html+='</button></div>';
-
-  // ── شبكة الأشهر (تظهر عند الضغط) ──
+  // ── أشهر السنة ──
+  html+='<div style="margin-bottom:10px;background:'+TB.cardBg+';border:2px solid '+TB.border+';border-radius:14px;overflow:hidden">';
+  html+='<div onclick="STATE.showMonths=!STATE.showMonths;render()" style="cursor:pointer;padding:12px 14px;display:flex;align-items:center;justify-content:space-between">';
+  html+='<div style="display:flex;align-items:center;gap:9px"><span style="font-size:20px">🗓️</span>';
+  html+='<div><div style="font-weight:900;font-size:13px;color:'+TB.text+'">أشهر السنة</div>';
+  html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+CY+' م</div></div></div>';
+  html+='<span style="font-size:16px;color:'+TB.textMuted+'">'+(STATE.showMonths?'▲':'▼')+'</span>';
+  html+='</div>';
   if(STATE.showMonths){
-    html+='<div style="display:flex;flex-direction:column;gap:8px;padding:8px 12px 0">';
+    html+='<div style="border-top:1px solid '+TB.border+';padding:8px 10px">';
     for(var i=0;i<12;i++){
       var isCur=i===CM,isRamM=RAM_MONTHS.has(i);
-      var cnt=0;for(var d=1;d<=31;d++)cnt+=(STATE.expenses[dk(i,d)]||[]).length;
-      var mTotUsd=0;for(var d=1;d<=31;d++){(STATE.expenses[dk(i,d)]||[]).forEach(function(e){mTotUsd+=n(e.usd);});}
-      var h1=toHijri(CY,i+1,1),h15=toHijri(CY,i+1,15);
-      var hjLabel=isRamM?'رمضان المبارك':(HJM[h1.hm-1]+(h1.hm!==h15.hm?' / '+HJM[h15.hm-1]:''));
-      var accentColor=isCur?TB.blue:isRamM?GOLD:TB.textFaint;
-      var bg=isCur?TB.curBg:isRamM?(IS_DAY?'linear-gradient(135deg,#FFF8E8,#FFF3D0)':'linear-gradient(135deg,#1A1200,#201600)'):TB.cardBg;
-      var bdr=isCur?TB.curBorder:isRamM?GOLD_BDR:cnt>0?TB.border2:TB.border;
-      html+='<div class="card" onclick="goDays('+i+')" style="background:'+bg+';border:2px solid '+bdr+';border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;box-shadow:'+(isCur?'0 4px 16px rgba(79,142,247,.2)':isRamM?'0 4px 14px rgba(245,166,35,.15)':'none')+'">';
-      html+='<div style="position:absolute;right:0;top:0;bottom:0;width:4px;background:'+(isCur?TB.blue:isRamM?GOLD:cnt>0?'#4ADE80':TB.border)+';border-radius:0 14px 14px 0"></div>';
-      html+='<div style="width:44px;height:44px;border-radius:12px;background:'+(isCur?TB.blue+'22':isRamM?'rgba(245,166,35,.15)':(IS_DAY?'#F0F4FF':'#1A2040'))+';display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">';
-      html+='<span style="font-size:'+(isRamM?'20':'18')+'px;line-height:1">'+(isRamM?'🌙':String(i+1).padStart(2,'0'))+'</span>';
-      if(!isRamM)html+='<span style="font-size:8px;color:'+accentColor+';font-weight:700;margin-top:1px">'+CY.toString().slice(-2)+'</span>';
-      html+='</div>';
-      html+='<div style="flex:1;min-width:0">';
-      html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
-      html+='<span style="font-weight:900;font-size:16px;color:'+(isCur?TB.blue:isRamM?GOLD:TB.text)+'">'+GRM[i]+'</span>';
-      if(isCur)html+='<span style="background:'+TB.blue+';color:#fff;font-size:8px;font-weight:900;padding:2px 6px;border-radius:5px">الآن</span>';
-      html+='</div>';
-      html+='<div style="font-size:10px;color:'+(isRamM?GOLD_DIM:TB.textMuted)+'">'+hjLabel+' · '+h1.hy+' هـ</div>';
-      html+='</div>';
-      html+='<div style="text-align:center;flex-shrink:0">';
-      if(cnt>0){
-        html+='<div style="font-weight:900;font-size:18px;color:'+(isRamM?GOLD:'#4ADE80')+'">'+cnt+'</div>';
-        html+='<div style="font-size:9px;color:'+TB.textMuted+'">مصروف</div>';
-        if(mTotUsd>0)html+='<div style="font-size:10px;font-weight:700;color:#66BB6A">$'+mTotUsd.toFixed(0)+'</div>';
-      } else {
-        html+='<div style="font-size:20px;color:'+TB.textFaint+'">—</div>';
-      }
+      var cnt=0;for(var dv=1;dv<=31;dv++)cnt+=(STATE.expenses[dk(i,dv)]||[]).length;
+      var h1=toHijri(CY,i+1,1);
+      var hjLabel=isRamM?'رمضان':HJM[h1.hm-1];
+      var mbg=isCur?TB.curBg:isRamM?(IS_DAY?'#FFF8E8':'#1A1200'):TB.cardBg2;
+      var mbdr=isCur?TB.curBorder:isRamM?GOLD_BDR:TB.border;
+      html+='<div class="card" onclick="goDays('+i+')" style="background:'+mbg+';border:1px solid '+mbdr+';border-radius:11px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:6px">';
+      html+='<div style="width:36px;height:36px;border-radius:10px;background:'+(isCur?TB.blue+'22':isRamM?'rgba(245,166,35,.15)':(IS_DAY?'#F0F4FF':'#1A2040'))+';display:flex;align-items:center;justify-content:center;font-size:'+(isRamM?'18':'14')+'px;flex-shrink:0">'+(isRamM?'🌙':String(i+1).padStart(2,'0'))+'</div>';
+      html+='<div style="flex:1"><div style="display:flex;align-items:center;gap:5px">';
+      html+='<span style="font-weight:900;font-size:14px;color:'+(isCur?TB.blue:isRamM?GOLD:TB.text)+'">'+GRM[i]+'</span>';
+      if(isCur)html+='<span style="background:'+TB.blue+';color:#fff;font-size:8px;font-weight:900;padding:1px 5px;border-radius:4px">الآن</span>';
+      html+='</div><div style="font-size:10px;color:'+TB.textMuted+'">'+hjLabel+'</div></div>';
+      html+='<div style="text-align:center">';
+      if(cnt>0){html+='<div style="font-weight:900;font-size:15px;color:'+(isRamM?GOLD:'#4ADE80')+'">'+cnt+'</div><div style="font-size:9px;color:'+TB.textMuted+'">مصروف</div>';}
+      else html+='<div style="color:'+TB.textFaint+'">—</div>';
       html+='</div></div>';
     }
     html+='</div>';
   }
+  html+='</div>';
 
-  // رمضان + إدخال ملف
-  var ramTotUsd=0;
-  RAM_DAYS.forEach(function(r){(STATE.expenses[dk(r.month,r.day)]||[]).forEach(function(e){ramTotUsd+=n(e.usd);});});
-  html+='<div style="padding:10px 12px 80px">';
-  html+='<div class="card" onclick="goRamadan()" style="background:'+(IS_DAY?'linear-gradient(135deg,#FFF8E0,#FFF0C0)':'linear-gradient(135deg,#1A1200,#2C1B00)')+';border:2px solid '+GOLD_BDR+';border-radius:16px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;box-shadow:'+(IS_DAY?'0 4px 20px rgba(245,166,35,.2)':'0 0 18px rgba(245,166,35,.25)')+'">';
-  html+='<div class="moon-pulse" style="font-size:38px;line-height:1">🌙</div>';
-  html+='<div><div style="font-weight:900;font-size:16px;color:'+GOLD+'">رمضان المبارك 1447 هـ</div>';
-  html+='<div style="font-size:10px;color:'+GOLD_DIM+';margin-top:2px">18 فبراير — 19 مارس 2026</div></div>';
-  html+='<div style="text-align:center"><div style="font-size:9px;color:'+GOLD_DIM+';margin-bottom:3px">إجمالي</div>';
-  html+='<div style="font-weight:900;font-size:16px;color:'+GOLD+'">$ '+fmt(ramTotUsd)+'</div></div>';
-  html+='</div></div>';
+  // ── رمضان ──
+  html+='<div class="card" onclick="goRamadan()" style="background:'+(IS_DAY?'linear-gradient(135deg,#FFF8E0,#FFF0C0)':'linear-gradient(135deg,#1A1200,#2C1B00)')+';border:2px solid '+GOLD_BDR+';border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px">';
+  html+='<div class="moon-pulse" style="font-size:34px">🌙</div>';
+  html+='<div style="flex:1"><div style="font-weight:900;font-size:15px;color:'+GOLD+'">رمضان المبارك 1447 هـ</div>';
+  html+='<div style="font-size:10px;color:'+GOLD_DIM+'">18 فبراير — 19 مارس 2026</div></div>';
+  if(ramTotUsd>0)html+='<div style="text-align:center"><div style="font-size:9px;color:'+GOLD_DIM+'">إجمالي</div><div style="font-weight:900;font-size:15px;color:'+GOLD+'">$'+fmt(ramTotUsd)+'</div></div>';
+  html+='</div>';
 
+  html+='</div>';
   html+='<input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(this)"/>';
   html+='</div>';
   return html;
 }
-
 
 function renderRamadan(){
   var rt={try:0,usd:0,syp:0};
@@ -821,9 +729,6 @@ function renderRamadan(){
   return html;
 }
 
-/* ══════════════════════════════════════
-   DAYS VIEW
-══════════════════════════════════════ */
 function renderDays(){
   var m=STATE.selMonth;
   var isRamM=RAM_MONTHS.has(m);
@@ -865,9 +770,6 @@ function renderDays(){
   return html;
 }
 
-/* ══════════════════════════════════════
-   DAY VIEW
-══════════════════════════════════════ */
 function renderDay(){
   var m=STATE.selMonth,d=STATE.selDay;
   var isRamD=isRamDay(m,d),rNum=ramDayNum(m,d);
@@ -971,9 +873,6 @@ function tcCell(sym,color,label,val,big){
     '<div style="font-weight:900;font-size:'+(big?'17':'13')+'px;color:'+(val==='—'?TB.textFaint:color)+'">'+val+'</div></div>';
 }
 
-/* ══════════════════════════════════════
-   MODALS
-══════════════════════════════════════ */
 function renderModal(){
   var el=document.getElementById('modal-layer');
   if(!el){
@@ -1005,7 +904,6 @@ function renderModal(){
   }
 }
 
-/* ══ FIRST-TIME SETUP MODAL ══ */
 function renderSetupModal(){
   return '<div class="overlay-center su">'+
     '<div class="modal-center" style="background:'+TB.hdrBg+';max-height:92vh;overflow-y:auto">'+
@@ -1038,7 +936,6 @@ function renderSetupModal(){
     '</div></div>';
 }
 
-/* ══ EDIT NAME ONLY ══ */
 function renderNameModal(){
   return '<div class="overlay-center su" onclick="closeModalBg(event)">'+
     '<div class="modal-center" style="background:'+TB.hdrBg+'">'+
@@ -1179,7 +1076,6 @@ function renderAddModal(){
   return html;
 }
 
-/* ══ SESSION REVIEW MODAL ══ */
 function renderSessionModal(){
   var items=STATE.sessionItems;
   var totTry=0,totUsd=0,totSyp=0;
@@ -1237,7 +1133,6 @@ function renderSessionModal(){
   return html;
 }
 
-/* ══ CONFIRM DELETE ══ */
 function renderConfirmDel(){
   return '<div class="overlay-center su" onclick="closeModalBg(event)">'+
     '<div class="modal-center" style="background:'+TB.hdrBg+';text-align:center;max-width:320px">'+
@@ -1249,7 +1144,6 @@ function renderConfirmDel(){
     '<button onclick="openModal(\'session\')" style="padding:12px 0;background:'+TB.cardBg2+';color:'+TB.textMuted+';border:1px solid '+TB.border2+';border-radius:11px;font-weight:700">إلغاء</button>'+
     '</div></div></div>';
 }
-
 
 function renderShareModal(){
   var m=STATE.selMonth,d=STATE.selDay;
@@ -1282,8 +1176,6 @@ function renderShareModal(){
     '</div></div></div>';
 }
 
-
-/* ══ SYNC MAIN MODAL ══ */
 function renderSyncModal(){
   var connected=!!SYNC.blobId;
   var statusColors={off:'#566078',syncing:'#FBB924',ok:'#4ADE80',err:'#EF5350'};
@@ -1333,7 +1225,6 @@ function renderSyncModal(){
   return html;
 }
 
-/* ══ JOIN ROOM MODAL ══ */
 function renderJoinSyncModal(){
   return '<div class="overlay-center su" onclick="closeModalBg(event)">'+
     '<div class="modal-center" style="background:'+TB.hdrBg+'">'+
@@ -1348,7 +1239,6 @@ function renderJoinSyncModal(){
     '</div></div></div>';
 }
 
-/* ══ SHOW CREATED CODE ══ */
 function renderSyncCodeModal(){
   return '<div class="overlay-center su">'+
     '<div class="modal-center" style="background:'+TB.hdrBg+';text-align:center">'+
@@ -1364,9 +1254,6 @@ function renderSyncCodeModal(){
     '<button onclick="closeModal()" style="padding:12px 0;background:linear-gradient(135deg,#4ADE80,#22C55E);color:#000;border:none;border-radius:11px;font-weight:900;font-size:14px">تم ✓</button>'+
     '</div></div></div>';
 }
-
-
-
 
 function confirmDebtPaid(id){
   STATE.debtConfirmId=id;
@@ -1687,8 +1574,6 @@ function disconnectSync(){
   closeModal();
 }
 
-
-/* ══ ADD DEBT MODAL ══ */
 function renderAddDebtModal(){
   var d=new Date();
   var todayStr=activeDateLabel();
@@ -1724,10 +1609,6 @@ function renderAddDebtModal(){
   return html;
 }
 
-
-/* ══════════════════════════════════════
-   DHIKR DAILY MODAL
-══════════════════════════════════════ */
 var ADHKAR=[
   {txt:'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ',sub:'من قالها مئة مرة حُطَّت خطاياه ولو كانت مثل زبد البحر'},
   {txt:'لَا إِلَهَ إِلَّا اللهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',sub:'من قالها عشرًا كانت كعتق أربعة أنفس من ولد إسماعيل'},
@@ -1798,29 +1679,11 @@ function renderDhikrModal(){
   return html;
 }
 
-/* ══════════════════════════════════════
-   ADMIN PANEL FUNCTIONS
-══════════════════════════════════════ */
-/* ══════════════════════════════════════
-   TRIAL + ACTIVATION SYSTEM (محلي 100%)
-   - 30 يوم تجربة مجانية من أول تشغيل
-   - بعدها: شاشة كود التفعيل
-   - الكود يُحسب من UID بدون server
-══════════════════════════════════════ */
-
 // مفتاح سري — لا تشاركه مع أحد
 var CODE_SECRET='Alhloo_HB_2025_Secret';
 var CHARS32='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 var CODES_BLOB_KEY='hb_codes_blob';// معرّف blob الأكواد
 var TRIAL_DAYS=30;
-
-/* ══════════════════════════════════════
-   نظام الأكواد الجديد:
-   - الأدمن ينشئ كوداً بمدة محددة بدون UID
-   - الكود: NONCE(6) + DAYS(3) + CHECK(3) = 12 حرف → XXXX-XXXX-XXXX
-   - التحقق من "مستخدم مرة واحدة" عبر npoint.io
-   - بعد التفعيل يعمل بدون نت
-══════════════════════════════════════ */
 
 function _n2s(n,len){var s='';for(var i=0;i<len;i++){s=CHARS32[n%32]+s;n=Math.floor(n/32);}return s;}
 function _s2n(s){var n=0;for(var i=0;i<s.length;i++){var x=CHARS32.indexOf(s[i]);if(x<0)return -1;n=n*32+x;}return n;}
@@ -1864,10 +1727,6 @@ function parseVoucher(code){
   return {nonce:nonce,days:days};
 }
 
-/* ══════════════════════════════════════
-   Blob الأكواد على npoint.io
-   بنية: { "NONCE": { days, created, usedBy:"UID"|null, usedAt:timestamp|null } }
-══════════════════════════════════════ */
 var _codesBlobId=null;
 
 function getCodesBlobId(){
@@ -1928,9 +1787,6 @@ function createCodesBlob(cb){
     }).catch(function(){cb(null);});
 }
 
-/* ══════════════════════════════════════
-   حالة الترخيص
-══════════════════════════════════════ */
 function getLicenseStatus(){
   var uid=getOrCreateUID();
 
@@ -1963,7 +1819,6 @@ function requestCodeOnWA(){
   window.open('https://wa.me/'+WA_NUM+'?text='+encodeURIComponent(msg),'_blank');
 }
 
-/* إدخال الكود من قِبل المستخدم */
 function submitAccessCode(){
   var raw=((document.getElementById('access-code-inp')||{}).value||'').trim().toUpperCase();
   var uid=getOrCreateUID();
@@ -2036,7 +1891,6 @@ function _activateLocally(uid,parsed,raw,errEl,btnEl,offline){
   }
 }
 
-/* شاشة انتهاء المدة */
 function renderExpiredScreen(){
   var savedNonce=lsGet('hb_act_nonce')||'';
   var isRenew=savedNonce===''&&getRequestCount()>0;// سبق أن طلب كوداً
@@ -2061,9 +1915,6 @@ function renderExpiredScreen(){
     '</div></div>';
 }
 
-/* ══════════════════════════════════════
-   ADMIN TAP + LOGIN
-══════════════════════════════════════ */
 var _adminTaps=0,_adminTimer=null;
 function adminTap(){
   _adminTaps++;
@@ -2125,9 +1976,6 @@ function doAdminLogin(){
   }
 }
 
-/* ══════════════════════════════════════
-   ADMIN PANEL — لوحة التحكم المحلية
-══════════════════════════════════════ */
 function setGenDays(n){
   var el=document.getElementById('admin-gen-days');
   if(el)el.value=n;
@@ -2475,9 +2323,6 @@ function renderAdminPanel(){
   return html;
 }
 
-/* ══════════════════════════════════════
-   SETTINGS DRAWER
-══════════════════════════════════════ */
 function openDrawer(){
   STATE.drawerOpen=true;
   renderDrawer();
@@ -2638,9 +2483,6 @@ function renderDrawer(){
   el.innerHTML=html;
 }
 
-/* ══════════════════════════════════════
-   FLOATING CALCULATOR
-══════════════════════════════════════ */
 function renderCalc(){
   var el=document.getElementById('calc-layer');
   if(!el){el=document.createElement('div');el.id='calc-layer';document.getElementById('app').appendChild(el);}
@@ -2684,10 +2526,7 @@ function renderCalc(){
   el.innerHTML=calcHtml;
 }
 
-/* ══════════════════════════════════════
-   EVENT HANDLERS
-══════════════════════════════════════ */
-function bindEvents(){/* events bound inline via onclick */}
+function bindEvents(){}
 
 function goBack(){window.history.back();}
 
@@ -2819,7 +2658,6 @@ function onAmtInput(curId, val){
   }
 }
 
-
 function syncSession(){
   STATE.sessionItems = (STATE.expenses[activeKey()]||[]).slice();
 }
@@ -2931,9 +2769,6 @@ function calcPress(v){
 
 function escHtml(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-/* ══════════════════════════════════════
-   HISTORY
-══════════════════════════════════════ */
 window.addEventListener('popstate',function(e){
   var s=e.state||{view:'months'};
   // إذا كان مودال مفتوح — أغلقه فقط
@@ -2949,10 +2784,6 @@ window.addEventListener('popstate',function(e){
   render();
 });
 
-
-/* ══════════════════════════════════════
-   KEYBOARD SCROLL — منع التغطية
-══════════════════════════════════════ */
 document.addEventListener('focusin', function(e){
   var el=e.target;
   if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'){
@@ -2986,9 +2817,6 @@ if(window.visualViewport){
   });
 }
 
-/* ══════════════════════════════════════
-   INIT
-══════════════════════════════════════ */
 function _loadState(){
   var expRaw=lsGet('hb_expenses');
   var ratRaw=lsGet('hb_rates');
