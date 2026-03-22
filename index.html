@@ -286,7 +286,7 @@ var STATE={
   confirmDelId:null,// id of item pending delete confirmation (session)
   confirmDelKey:null,// key for delExpense confirm
   confirmDelExpId:null,// id for delExpense confirm
-  calcExpr:'',calcResult:'',calcOpen:false,debtsOpen:false,debtConfirmId:null,debtConfirmType:null,drawerOpen:false,
+  calcExpr:'',calcResult:'',calcOpen:false,debtsOpen:false,showMonths:false,debtConfirmId:null,debtConfirmType:null,drawerOpen:false,
 };
 
 
@@ -309,6 +309,7 @@ var NPOINT_API='https://api.npoint.io';
 ══════════════════════════════════════ */
 // ⚠️ غيّر هذه الكلمة السرية — الأدمن فقط يعرفها
 var ADMIN_KEY='770389';
+var WA_NUM='963968688718';// رقم الواتساب الدولي
 
 function generateUID(){
   var chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -577,100 +578,112 @@ function renderHeader(showBack,isRam){
    MONTHS VIEW
 ══════════════════════════════════════ */
 function renderMonths(){
-  var ramCount=RAM_DAYS.filter(function(r){return(STATE.expenses[dk(r.month,r.day)]||[]).length>0;}).length;
-  var ramTotUsd=0;
-  RAM_DAYS.forEach(function(r){(STATE.expenses[dk(r.month,r.day)]||[]).forEach(function(e){ramTotUsd+=n(e.usd);});});
+  var allExp=Object.values(STATE.expenses).flat();
+  var spentUsd=sumC(allExp,'usd');
+  var hasIncome=n(STATE.income.try)>0||n(STATE.income.usd)>0||n(STATE.income.syp)>0;
+  var remUsd=hasIncome?n(STATE.income.usd)-spentUsd:null;
+  var pctUsed=hasIncome&&n(STATE.income.usd)>0?Math.min(100,Math.round(spentUsd/n(STATE.income.usd)*100)):0;
+  var barColor=pctUsed>85?'#EF5350':pctUsed>60?'#FBB924':'#4ADE80';
+  var todayHj=toHijri(CY,CM+1,CD);
+  var isRamToday=isRamDay(CM,CD),rNumToday=ramDayNum(CM,CD);
+  var todayItems=(STATE.expenses[TODAY_KEY]||[]).length;
 
   var html='<div class="page" style="background:'+TB.appBg+'">'+renderHeader(false,false);
 
-  // ── Greeting bar ──
-  html+='<div style="padding:10px 14px 0;display:flex;align-items:center;gap:8px">';
-  html+='<span style="font-size:20px">'+(CH>=7&&CH<12?'🌤️':CH>=12&&CH<20?'🌇':'🌙')+'</span>';
+  // ── تحية + تاريخ ──
+  html+='<div onclick="adminTap()" style="padding:10px 14px 0;display:flex;align-items:center;gap:10px;cursor:pointer;-webkit-tap-highlight-color:transparent">';
+  html+='<span style="font-size:26px">'+(CH>=7&&CH<12?'🌤️':CH>=12&&CH<20?'🌇':'🌙')+'</span>';
   html+='<div>';
-  html+='<div style="font-weight:900;font-size:16px;color:'+(IS_DAY?'#1A2035':'#E4EDF8')+'">'+(CH>=7&&CH<12?'صباح الخير':'مساء الخير')+(STATE.spender?' يا '+STATE.spender:'')+'</div>';
-  html+='<div style="font-size:11px;color:'+TB.textMuted+'">'+ARD[NOW.getDay()]+' '+CD+' '+GRM[CM]+' '+CY+' م</div>';
+  html+='<div style="font-weight:900;font-size:18px;color:'+(IS_DAY?'#1A2035':'#E4EDF8')+'">'+(CH>=7&&CH<12?'صباح الخير':'مساء الخير')+(STATE.spender?' يا '+STATE.spender:'')+'</div>';
+  html+='<div style="font-size:12px;color:'+TB.textMuted+'">'+ARD[NOW.getDay()]+' '+CD+' '+GRM[CM]+' '+CY+' م</div>';
   html+='</div></div>';
 
-  // ── Today date banner ──
-  var todayHj=toHijri(CY,CM+1,CD);
-  var isRamToday=isRamDay(CM,CD),rNumToday=ramDayNum(CM,CD);
-  html+='<div onclick="adminTap()" style="margin:10px 12px 0;cursor:pointer;-webkit-tap-highlight-color:transparent;background:'+(isRamToday?(IS_DAY?'linear-gradient(135deg,#FFF8E0,#FFF0C0)':'linear-gradient(135deg,#1A1200,#2A1900)'):(IS_DAY?TB.curBg:'linear-gradient(135deg,#0D1E3F,#0A1830)'))+';border:2px solid '+(isRamToday?GOLD_BDR:TB.curBorder)+';border-radius:15px;padding:13px 15px;box-shadow:'+(isRamToday?'0 4px 18px rgba(245,166,35,.25)':'0 4px 18px rgba(79,142,247,.2)')+'">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between">'+
-    '<div>'+
-    '<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">'+
-    '<span style="background:'+(isRamToday?GOLD:TB.blue)+';color:#fff;border-radius:8px;padding:3px 9px;font-size:10px;font-weight:900">اليوم</span>'+
-    (isRamToday?'<span style="font-size:11px;color:'+GOLD+';font-weight:700">اليوم '+rNumToday+' من رمضان 🌙</span>':'')+
-    '</div>'+
-    '<div style="font-weight:900;font-size:22px;color:'+(isRamToday?GOLD:TB.blue)+';line-height:1.2">'+ARD[NOW.getDay()]+' '+CD+' '+GRM[CM]+'</div>'+
-    '<div style="font-size:12px;color:'+(isRamToday?GOLD_DIM:TB.textSub)+';margin-top:2px">'+CY+' م  —  '+todayHj.hd+' '+HJM[todayHj.hm-1]+' '+todayHj.hy+' هـ</div>'+
-    '</div>'+
-    '<div style="text-align:center">'+
-    '<div style="font-size:36px;font-weight:900;color:'+(isRamToday?GOLD:TB.blue)+';line-height:1">'+CD+'</div>'+
-    '<div style="font-size:10px;color:'+(isRamToday?GOLD_DIM:TB.textSub)+'">'+GRM[CM]+'</div>'+
-    '</div></div></div>';
+  // adminTap منقول للتحية
 
-  // Income balance card
-  var hasIncome=n(STATE.income.try)>0||n(STATE.income.usd)>0||n(STATE.income.syp)>0;
+  // زر 1: مصروف جديد
+  var isRamNow=isRamToday;
+  html+='<button onclick="openModal(\'add\')" style="'+
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;'+
+    'padding:20px 10px;'+
+    'background:'+(isRamNow?'linear-gradient(135deg,'+GOLD+',#C8810A)':'linear-gradient(135deg,'+TB.blue+','+TB.blueDim+')')+';'+
+    'color:'+(isRamNow?'#000':'#fff')+';'+
+    'border:none;border-radius:18px;'+
+    'font-family:\'Cairo\',\'Tahoma\',sans-serif;'+
+    'box-shadow:0 6px 20px '+(isRamNow?'rgba(245,166,35,.4)':'rgba(79,142,247,.4)')+';'+
+    'cursor:pointer;transition:transform .15s;-webkit-tap-highlight-color:transparent">'+
+    '<span style="font-size:32px">➕</span>'+
+    '<span style="font-weight:900;font-size:16px">مصروف جديد</span>'+
+    '<span style="font-size:11px;opacity:.85">'+(todayItems>0?todayItems+' مادة اليوم':'سجّل مصروفك')+'</span>'+
+    '</button>';
+
+  // زر 2: أشهر السنة
+  var ramCount=RAM_DAYS.filter(function(r){return(STATE.expenses[dk(r.month,r.day)]||[]).length>0;}).length;
+  html+='<button onclick="goDays('+CM+')" style="'+
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;'+
+    'padding:20px 10px;'+
+    'background:'+(IS_DAY?'#fff':'#0F1525')+';'+
+    'color:'+TB.text+';'+
+    'border:2px solid '+TB.border+';border-radius:18px;'+
+    'font-family:\'Cairo\',\'Tahoma\',sans-serif;'+
+    'box-shadow:0 4px 16px '+TB.shadow+';'+
+    'cursor:pointer;-webkit-tap-highlight-color:transparent">'+
+    '<span style="font-size:32px">📅</span>'+
+    '<span style="font-weight:900;font-size:16px;color:'+TB.text+'">'+GRM[CM]+'</span>'+
+    '<span style="font-size:11px;color:'+TB.textMuted+'">الشهر الحالي</span>'+
+    '</button>';
+
+  html+='</div>';
+
+  // ── بطاقة الميزانية إن وجدت ──
   if(hasIncome){
-    var allExp=Object.values(STATE.expenses).flat();
-    var spentTry=sumC(allExp,'try'),spentUsd=sumC(allExp,'usd'),spentSyp=sumC(allExp,'syp');
-    var remTry=n(STATE.income.try)-spentTry,remUsd=n(STATE.income.usd)-spentUsd,remSyp=n(STATE.income.syp)-spentSyp;
-    var pctUsed=n(STATE.income.usd)>0?Math.min(100,Math.round(spentUsd/n(STATE.income.usd)*100)):
-                n(STATE.income.try)>0?Math.min(100,Math.round(spentTry/n(STATE.income.try)*100)):0;
-    var barColor=pctUsed>85?'#EF5350':pctUsed>60?'#FBB924':'#4ADE80';
-    html+='<div style="margin:9px 12px 0;background:'+TB.cardBg+';border:1px solid '+TB.border+';border-radius:14px;padding:12px 14px">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
-      '<div style="font-weight:900;font-size:13px;color:'+TB.blue+'">💰 ميزانية الشهر</div>'+
-      '<div style="display:flex;align-items:center;gap:6px">'+
-      '<div onclick="openModal(\'session\')" style="cursor:pointer;display:flex;align-items:center;gap:4px;background:'+(STATE.sessionItems.length>0?'rgba(74,222,128,.12)':'rgba(79,142,247,.07)')+';border:1px solid '+(STATE.sessionItems.length>0?'rgba(74,222,128,.35)':'rgba(79,142,247,.2)')+';border-radius:20px;padding:4px 9px">'+
-      '<span style="font-size:13px">🗒️</span>'+
-      '<span style="font-size:10px;font-weight:700;color:'+(STATE.sessionItems.length>0?'#4ADE80':TB.textMuted)+'">'+(STATE.sessionItems.length>0?STATE.sessionItems.length+' اشتريت اليوم':'اشتريت اليوم')+'</span></div>'+
-      '<div style="font-size:10px;color:'+barColor+';font-weight:700;background:'+barColor+'18;border-radius:20px;padding:4px 8px">'+pctUsed+'% مُنفق</div>'+
-      '</div></div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">'+
-      (n(STATE.income.try)>0?'<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">'+
-        '<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">₺ المتبقي</div>'+
-        '<div style="font-weight:900;font-size:16px;color:'+(remTry<0?'#EF5350':'#4ADE80')+'">'+fmt(remTry)+'</div>'+
-        '<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.try))+'</div></div>':'')+
-      (n(STATE.income.usd)>0?'<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">'+
-        '<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">$ المتبقي</div>'+
-        '<div style="font-weight:900;font-size:16px;color:'+(remUsd<0?'#EF5350':'#4ADE80')+'">'+fmt(remUsd)+'</div>'+
-        '<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.usd))+'</div></div>':'')+
-      (n(STATE.income.syp)>0?'<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">'+
-        '<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">ل.س المتبقي</div>'+
-        '<div style="font-weight:900;font-size:16px;color:'+(remSyp<0?'#EF5350':'#4ADE80')+'">'+fmt(remSyp)+'</div>'+
-        '<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.syp))+'</div></div>':'')+
-      '</div>'+
-      '<div style="background:'+TB.border+';border-radius:99px;height:5px;overflow:hidden">'+
-      '<div style="height:100%;width:'+pctUsed+'%;background:'+barColor+';border-radius:99px;transition:width .3s"></div></div>'+
-      '</div>';
-  }
-
-  // Session note card (shown even without income)
-  if(!hasIncome){
-    html+='<div style="margin:9px 12px 0">';
-    html+='<div onclick="openModal(\'session\')" style="cursor:pointer;display:flex;align-items:center;gap:10px;background:'+(STATE.sessionItems.length>0?'rgba(74,222,128,.08)':TB.cardBg)+';border:1px solid '+(STATE.sessionItems.length>0?'rgba(74,222,128,.3)':TB.border)+';border-radius:13px;padding:11px 14px">';
+    html+='<div style="margin:10px 12px 0;background:'+TB.cardBg+';border:1px solid '+TB.border+';border-radius:14px;padding:12px 14px">';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    html+='<div style="font-weight:900;font-size:13px;color:'+TB.blue+'">💰 ميزانية الشهر</div>';
+    html+='<div onclick="openModal(\'session\')" style="cursor:pointer;display:flex;align-items:center;gap:4px;background:'+(todayItems>0?'rgba(74,222,128,.12)':'rgba(79,142,247,.07)')+';border:1px solid '+(todayItems>0?'rgba(74,222,128,.35)':'rgba(79,142,247,.2)')+';border-radius:20px;padding:4px 9px">';
+    html+='<span style="font-size:13px">🗒️</span>';
+    html+='<span style="font-size:10px;font-weight:700;color:'+(todayItems>0?'#4ADE80':TB.textMuted)+'">'+(todayItems>0?todayItems+' اشتريت اليوم':'اشتريت اليوم')+'</span>';
+    html+='</div></div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">';
+    if(n(STATE.income.usd)>0){
+      html+='<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">';
+      html+='<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">$ المتبقي</div>';
+      html+='<div style="font-weight:900;font-size:16px;color:'+(remUsd<0?'#EF5350':'#4ADE80')+'">'+fmt(remUsd)+'</div>';
+      html+='<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.usd))+'</div></div>';
+    }
+    if(n(STATE.income.try)>0){
+      var remTry=n(STATE.income.try)-sumC(allExp,'try');
+      html+='<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">';
+      html+='<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">₺ المتبقي</div>';
+      html+='<div style="font-weight:900;font-size:16px;color:'+(remTry<0?'#EF5350':'#4ADE80')+'">'+fmt(remTry)+'</div>';
+      html+='<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.try))+'</div></div>';
+    }
+    if(n(STATE.income.syp)>0){
+      var remSyp=n(STATE.income.syp)-sumC(allExp,'syp');
+      html+='<div style="background:'+TB.inputBg+';border-radius:9px;padding:7px 6px;border:1px solid '+TB.border+'">';
+      html+='<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">ل.س المتبقي</div>';
+      html+='<div style="font-weight:900;font-size:16px;color:'+(remSyp<0?'#EF5350':'#4ADE80')+'">'+fmt(remSyp)+'</div>';
+      html+='<div style="font-size:9px;color:'+TB.textFaint+'">من '+fmt(n(STATE.income.syp))+'</div></div>';
+    }
+    html+='</div>';
+    html+='<div style="background:'+TB.border+';border-radius:99px;height:5px;overflow:hidden">';
+    html+='<div style="height:100%;width:'+pctUsed+'%;background:'+barColor+';border-radius:99px;transition:width .3s"></div></div>';
+    html+='</div>';
+  } else {
+    // بدون ميزانية: زر اشتريت اليوم
+    html+='<div onclick="openModal(\'session\')" style="margin:10px 12px 0;cursor:pointer;display:flex;align-items:center;gap:10px;background:'+(todayItems>0?'rgba(74,222,128,.08)':TB.cardBg)+';border:1px solid '+(todayItems>0?'rgba(74,222,128,.3)':TB.border)+';border-radius:13px;padding:11px 14px">';
     html+='<span style="font-size:22px">🗒️</span>';
     html+='<div style="flex:1">';
-    html+='<div style="font-weight:900;font-size:13px;color:'+(STATE.sessionItems.length>0?'#4ADE80':TB.textSub)+'">اشتريت اليوم</div>';
-    html+='<div style="font-size:11px;color:'+TB.textMuted+'">'+(STATE.sessionItems.length>0?STATE.sessionItems.length+' مادة مسجلة اليوم':'لا يوجد تسجيل اليوم — اضغط لعرض التفاصيل')+'</div>';
-    html+='</div>';
-    if(STATE.sessionItems.length>0){
-      var todayTotUsd=sumC(STATE.sessionItems,'usd');
-      html+='<div style="text-align:left"><div style="font-size:9px;color:'+TB.textMuted+'">الإجمالي</div><div style="font-weight:900;font-size:15px;color:#66BB6A">$ '+todayTotUsd.toFixed(2)+'</div></div>';
-    }
+    html+='<div style="font-weight:900;font-size:13px;color:'+(todayItems>0?'#4ADE80':TB.textSub)+'">اشتريت اليوم</div>';
+    html+='<div style="font-size:11px;color:'+TB.textMuted+'">'+(todayItems>0?todayItems+' مادة مسجلة':'لا يوجد تسجيل اليوم')+'</div>';
     html+='</div></div>';
   }
 
-
-    // ── Debts card ──
-  var totalDebtUsd=0;
-  STATE.debts.forEach(function(d){if(!d.paid)totalDebtUsd+=n(d.usd);});
+  // ── بطاقة ديوني ──
   var unpaidDebts=STATE.debts.filter(function(d){return !d.paid;});
   var dc=unpaidDebts.length;
+  var totalDebtUsd=unpaidDebts.reduce(function(s,d){return s+n(d.usd);},0);
   var dOpen=STATE.debtsOpen;
-  html+='<div style="margin:9px 12px 0;background:'+TB.cardBg+';border:2px solid rgba(251,146,60,.35);border-radius:15px;overflow:hidden">';
-  // ─ Header (قابل للضغط للفتح/الإغلاق)
+  html+='<div style="margin:10px 12px 0;background:'+TB.cardBg+';border:2px solid rgba(251,146,60,.35);border-radius:15px;overflow:hidden">';
   html+='<div onclick="STATE.debtsOpen=!STATE.debtsOpen;render()" style="cursor:pointer;background:rgba(251,146,60,.08);padding:11px 14px;display:flex;align-items:center;justify-content:space-between">';
   html+='<div style="display:flex;align-items:center;gap:8px">';
   html+='<span style="font-size:22px">📋</span>';
@@ -679,23 +692,21 @@ function renderMonths(){
   html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+(dc>0?dc+' دين غير مسدّد':'لا ديون معلّقة')+'</div>';
   html+='</div></div>';
   html+='<div style="display:flex;align-items:center;gap:7px">';
-  if(dc>0) html+='<div style="font-size:10px;color:#FB923C;font-weight:700;background:rgba(251,146,60,.12);border-radius:20px;padding:3px 9px">$'+fmt(totalDebtUsd)+'</div>';
-  html+='<span style="font-size:14px;color:#FB923C;margin-left:2px">'+(dOpen?'▲':'▼')+'</span>';
+  if(dc>0)html+='<div style="font-size:10px;color:#FB923C;font-weight:700;background:rgba(251,146,60,.12);border-radius:20px;padding:3px 9px">$'+fmt(totalDebtUsd)+'</div>';
+  html+='<span style="font-size:14px;color:#FB923C">'+(dOpen?'▲':'▼')+'</span>';
   html+='<button onclick="event.stopPropagation();openModal(\'addDebt\')" style="background:linear-gradient(135deg,#FB923C,#EA580C);color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:900">+ دين</button>';
   html+='</div></div>';
-  // ─ Body (مخفي افتراضياً)
   if(dOpen){
     if(dc>0){
       html+='<div style="padding:8px 12px 10px;max-height:260px;overflow-y:auto">';
       unpaidDebts.forEach(function(d){
         html+='<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:'+TB.cardBg2+';border:1px solid rgba(251,146,60,.2);border-radius:10px;margin-bottom:6px">';
-        html+='<div style="flex:1">';
-        html+='<div style="font-weight:900;font-size:14px;color:'+TB.text+'">'+escHtml(d.name)+'</div>';
-        if(d.note) html+='<div style="font-size:10px;color:'+TB.textMuted+'">🗒 '+escHtml(d.note)+'</div>';
+        html+='<div style="flex:1"><div style="font-weight:900;font-size:14px;color:'+TB.text+'">'+escHtml(d.name)+'</div>';
+        if(d.note)html+='<div style="font-size:10px;color:'+TB.textMuted+'">🗒 '+escHtml(d.note)+'</div>';
         html+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:4px">';
-        if(n(d.try)>0) html+='<span style="font-size:10px;color:#EF5350;font-weight:700">₺'+fmt(n(d.try))+'</span>';
-        if(n(d.usd)>0) html+='<span style="font-size:10px;color:#66BB6A;font-weight:700">$'+fmt(n(d.usd))+'</span>';
-        if(n(d.syp)>0) html+='<span style="font-size:10px;color:#42A5F5;font-weight:700">ل.س'+fmt(n(d.syp))+'</span>';
+        if(n(d.try)>0)html+='<span style="font-size:10px;color:#EF5350;font-weight:700">₺'+fmt(n(d.try))+'</span>';
+        if(n(d.usd)>0)html+='<span style="font-size:10px;color:#66BB6A;font-weight:700">$'+fmt(n(d.usd))+'</span>';
+        if(n(d.syp)>0)html+='<span style="font-size:10px;color:#42A5F5;font-weight:700">ل.س'+fmt(n(d.syp))+'</span>';
         html+='<span style="font-size:9px;color:'+TB.textFaint+'">📅 '+d.date+'</span>';
         html+='</div></div>';
         html+='<div style="display:flex;flex-direction:column;gap:5px">';
@@ -710,70 +721,74 @@ function renderMonths(){
   }
   html+='</div>';
 
+  // ── زر أشهر السنة ──
+  html+='<div style="margin:10px 12px 0">';
+  html+='<button onclick="STATE.showMonths=!STATE.showMonths;render()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:'+TB.cardBg+';border:2px solid '+TB.border+';border-radius:14px;cursor:pointer;font-family:\'Cairo\',\'Tahoma\',sans-serif">';
+  html+='<div style="display:flex;align-items:center;gap:9px">';
+  html+='<span style="font-size:22px">🗓️</span>';
+  html+='<div style="text-align:right">';
+  html+='<div style="font-weight:900;font-size:15px;color:'+TB.text+'">أشهر السنة</div>';
+  html+='<div style="font-size:10px;color:'+TB.textMuted+'">'+CY+' م</div>';
+  html+='</div></div>';
+  html+='<span style="font-size:18px;color:'+TB.textMuted+'">'+(STATE.showMonths?'▲':'▼')+'</span>';
+  html+='</button></div>';
 
-  // Ramadan card
-  html+='<div style="padding:10px 12px 0">'+
-
-    '<div class="card" onclick="goRamadan()" style="background:'+(IS_DAY?'linear-gradient(135deg,#FFF8E0,#FFF0C0)':'linear-gradient(135deg,#1A1200,#2C1B00)')+';border:2px solid '+GOLD_BDR+';border-radius:16px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;box-shadow:'+(IS_DAY?'0 4px 20px rgba(245,166,35,.2)':'0 0 18px rgba(245,166,35,.25)')+'">'+
-    '<div class="moon-pulse" style="font-size:38px;line-height:1">🌙</div>'+
-    '<div><div style="font-weight:900;font-size:16px;color:'+GOLD+'">رمضان المبارك 1447 هـ</div>'+
-    '<div style="font-size:10px;color:'+GOLD_DIM+';margin-top:2px">18 فبراير — 19 مارس 2026</div>'+
-    '<div style="display:flex;gap:5px;margin-top:5px">'+
-    Array.from(RAM_MONTHS).map(function(m){return '<span style="background:rgba(245,166,35,.15);border:1px solid rgba(245,166,35,.3);color:'+GOLD+';border-radius:20px;padding:1px 7px;font-size:9px;font-weight:700">'+GRM[m]+'</span>';}).join('')+
-    '</div></div>'+
-    '<div style="text-align:center"><div style="font-size:9px;color:'+GOLD_DIM+';margin-bottom:3px">إجمالي</div>'+
-    '<div style="font-weight:900;font-size:16px;color:'+GOLD+'">$ '+fmt(ramTotUsd)+'</div>'+
-    '<div style="font-size:9px;color:'+(IS_DAY?'#8B6830':'#6B4F10')+';margin-top:2px">'+ramCount+'/30 يوم</div></div>'+
-    '</div></div>';
-
-  // Month grid — مستطيلات أنيقة فوق بعض
-  html+='<div style="display:flex;flex-direction:column;gap:8px;padding:9px 12px 80px">';
-  for(var i=0;i<12;i++){
-    var isCur=i===CM,isRamM=RAM_MONTHS.has(i);
-    var cnt=0;for(var d=1;d<=31;d++) cnt+=(STATE.expenses[dk(i,d)]||[]).length;
-    var totUsd=0;for(var d=1;d<=31;d++){(STATE.expenses[dk(i,d)]||[]).forEach(function(e){totUsd+=n(e.usd);});}
-    var h1=toHijri(CY,i+1,1),h15=toHijri(CY,i+1,15);
-    var hjLabel=isRamM?'رمضان المبارك':(HJM[h1.hm-1]+(h1.hm!==h15.hm?' / '+HJM[h15.hm-1]:''));
-    var accentColor=isCur?TB.blue:isRamM?GOLD:TB.textFaint;
-    var bg=isCur?TB.curBg:isRamM?(IS_DAY?'linear-gradient(135deg,#FFF8E8,#FFF3D0)':'linear-gradient(135deg,#1A1200,#201600)'):TB.cardBg;
-    var bdr=isCur?TB.curBorder:isRamM?GOLD_BDR:cnt>0?(TB.border2):TB.border;
-    html+='<div class="card" onclick="goDays('+i+')" style="background:'+bg+';border:2px solid '+bdr+';border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;box-shadow:'+(isCur?'0 4px 16px rgba(79,142,247,.2)':isRamM?'0 4px 14px rgba(245,166,35,.15)':'none')+'">';
-    // شريط جانبي ملون
-    html+='<div style="position:absolute;right:0;top:0;bottom:0;width:4px;background:'+(isCur?TB.blue:isRamM?GOLD:cnt>0?'#4ADE80':TB.border)+';border-radius:0 14px 14px 0"></div>';
-    // رقم الشهر / رمز
-    html+='<div style="width:44px;height:44px;border-radius:12px;background:'+(isCur?TB.blue+'22':isRamM?'rgba(245,166,35,.15)':(IS_DAY?'#F0F4FF':'#1A2040'))+';display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">';
-    html+='<span style="font-size:'+(isRamM?'20':'18')+'px;line-height:1">'+(isRamM?'🌙':String(i+1).padStart(2,'0'))+'</span>';
-    if(!isRamM)html+='<span style="font-size:8px;color:'+accentColor+';font-weight:700;margin-top:1px">'+CY.toString().slice(-2)+'</span>';
-    html+='</div>';
-    // معلومات
-    html+='<div style="flex:1;min-width:0">';
-    html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
-    html+='<span style="font-weight:900;font-size:16px;color:'+(isCur?TB.blue:isRamM?GOLD:TB.text)+'">'+GRM[i]+'</span>';
-    if(isCur)html+='<span style="background:'+TB.blue+';color:#fff;font-size:8px;font-weight:900;padding:2px 6px;border-radius:5px">الآن</span>';
-    html+='</div>';
-    html+='<div style="font-size:10px;color:'+(isRamM?GOLD_DIM:TB.textMuted)+'">'+hjLabel+' · '+h1.hy+' هـ</div>';
-    html+='</div>';
-    // إحصاء يمين
-    html+='<div style="text-align:center;flex-shrink:0">';
-    if(cnt>0){
-      html+='<div style="font-weight:900;font-size:18px;color:'+(isRamM?GOLD:'#4ADE80')+'">'+cnt+'</div>';
-      html+='<div style="font-size:9px;color:'+TB.textMuted+'">مصروف</div>';
-      if(totUsd>0)html+='<div style="font-size:10px;font-weight:700;color:#66BB6A">$'+totUsd.toFixed(0)+'</div>';
-    } else {
-      html+='<div style="font-size:20px;color:'+TB.textFaint+'">—</div>';
+  // ── شبكة الأشهر (تظهر عند الضغط) ──
+  if(STATE.showMonths){
+    html+='<div style="display:flex;flex-direction:column;gap:8px;padding:8px 12px 0">';
+    for(var i=0;i<12;i++){
+      var isCur=i===CM,isRamM=RAM_MONTHS.has(i);
+      var cnt=0;for(var d=1;d<=31;d++)cnt+=(STATE.expenses[dk(i,d)]||[]).length;
+      var mTotUsd=0;for(var d=1;d<=31;d++){(STATE.expenses[dk(i,d)]||[]).forEach(function(e){mTotUsd+=n(e.usd);});}
+      var h1=toHijri(CY,i+1,1),h15=toHijri(CY,i+1,15);
+      var hjLabel=isRamM?'رمضان المبارك':(HJM[h1.hm-1]+(h1.hm!==h15.hm?' / '+HJM[h15.hm-1]:''));
+      var accentColor=isCur?TB.blue:isRamM?GOLD:TB.textFaint;
+      var bg=isCur?TB.curBg:isRamM?(IS_DAY?'linear-gradient(135deg,#FFF8E8,#FFF3D0)':'linear-gradient(135deg,#1A1200,#201600)'):TB.cardBg;
+      var bdr=isCur?TB.curBorder:isRamM?GOLD_BDR:cnt>0?TB.border2:TB.border;
+      html+='<div class="card" onclick="goDays('+i+')" style="background:'+bg+';border:2px solid '+bdr+';border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;box-shadow:'+(isCur?'0 4px 16px rgba(79,142,247,.2)':isRamM?'0 4px 14px rgba(245,166,35,.15)':'none')+'">';
+      html+='<div style="position:absolute;right:0;top:0;bottom:0;width:4px;background:'+(isCur?TB.blue:isRamM?GOLD:cnt>0?'#4ADE80':TB.border)+';border-radius:0 14px 14px 0"></div>';
+      html+='<div style="width:44px;height:44px;border-radius:12px;background:'+(isCur?TB.blue+'22':isRamM?'rgba(245,166,35,.15)':(IS_DAY?'#F0F4FF':'#1A2040'))+';display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">';
+      html+='<span style="font-size:'+(isRamM?'20':'18')+'px;line-height:1">'+(isRamM?'🌙':String(i+1).padStart(2,'0'))+'</span>';
+      if(!isRamM)html+='<span style="font-size:8px;color:'+accentColor+';font-weight:700;margin-top:1px">'+CY.toString().slice(-2)+'</span>';
+      html+='</div>';
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">';
+      html+='<span style="font-weight:900;font-size:16px;color:'+(isCur?TB.blue:isRamM?GOLD:TB.text)+'">'+GRM[i]+'</span>';
+      if(isCur)html+='<span style="background:'+TB.blue+';color:#fff;font-size:8px;font-weight:900;padding:2px 6px;border-radius:5px">الآن</span>';
+      html+='</div>';
+      html+='<div style="font-size:10px;color:'+(isRamM?GOLD_DIM:TB.textMuted)+'">'+hjLabel+' · '+h1.hy+' هـ</div>';
+      html+='</div>';
+      html+='<div style="text-align:center;flex-shrink:0">';
+      if(cnt>0){
+        html+='<div style="font-weight:900;font-size:18px;color:'+(isRamM?GOLD:'#4ADE80')+'">'+cnt+'</div>';
+        html+='<div style="font-size:9px;color:'+TB.textMuted+'">مصروف</div>';
+        if(mTotUsd>0)html+='<div style="font-size:10px;font-weight:700;color:#66BB6A">$'+mTotUsd.toFixed(0)+'</div>';
+      } else {
+        html+='<div style="font-size:20px;color:'+TB.textFaint+'">—</div>';
+      }
+      html+='</div></div>';
     }
     html+='</div>';
-    html+='</div>';
   }
+
+  // رمضان + إدخال ملف
+  var ramTotUsd=0;
+  RAM_DAYS.forEach(function(r){(STATE.expenses[dk(r.month,r.day)]||[]).forEach(function(e){ramTotUsd+=n(e.usd);});});
+  html+='<div style="padding:10px 12px 80px">';
+  html+='<div class="card" onclick="goRamadan()" style="background:'+(IS_DAY?'linear-gradient(135deg,#FFF8E0,#FFF0C0)':'linear-gradient(135deg,#1A1200,#2C1B00)')+';border:2px solid '+GOLD_BDR+';border-radius:16px;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;box-shadow:'+(IS_DAY?'0 4px 20px rgba(245,166,35,.2)':'0 0 18px rgba(245,166,35,.25)')+'">';
+  html+='<div class="moon-pulse" style="font-size:38px;line-height:1">🌙</div>';
+  html+='<div><div style="font-weight:900;font-size:16px;color:'+GOLD+'">رمضان المبارك 1447 هـ</div>';
+  html+='<div style="font-size:10px;color:'+GOLD_DIM+';margin-top:2px">18 فبراير — 19 مارس 2026</div></div>';
+  html+='<div style="text-align:center"><div style="font-size:9px;color:'+GOLD_DIM+';margin-bottom:3px">إجمالي</div>';
+  html+='<div style="font-weight:900;font-size:16px;color:'+GOLD+'">$ '+fmt(ramTotUsd)+'</div></div>';
+  html+='</div></div>';
+
+  html+='<input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(this)"/>';
   html+='</div>';
-  html+='<input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(this)"/>'+
-    '</div>';
   return html;
 }
 
-/* ══════════════════════════════════════
-   RAMADAN VIEW
-══════════════════════════════════════ */
+
 function renderRamadan(){
   var rt={try:0,usd:0,syp:0};
   RAM_DAYS.forEach(function(r){(STATE.expenses[dk(r.month,r.day)]||[]).forEach(function(e){rt.try+=n(e.try);rt.usd+=n(e.usd);rt.syp+=n(e.syp);});});
@@ -976,6 +991,8 @@ function renderModal(){
     case 'rateReminder': el.innerHTML=renderRateReminder();break;
     case 'session': el.innerHTML=renderSessionModal();break;
     case 'confirmDel': el.innerHTML=renderConfirmDel();break;
+    case 'exportModal': el.innerHTML=renderExportModal();break;
+    case 'importModal': el.innerHTML=renderImportModal();break;
     case 'sync': el.innerHTML=renderSyncModal();break;
     case 'joinSync': el.innerHTML=renderJoinSyncModal();break;
     case 'syncCode': el.innerHTML=renderSyncCodeModal();break;
@@ -1490,6 +1507,7 @@ function saveDebt(){
 // markDebtPaid and deleteDebt replaced by confirmDebtPaid/Delete
 
 function exportData(){
+  // بناء البيانات
   var data={
     hb_expenses: lsGet('hb_expenses'),
     hb_rates:    lsGet('hb_rates'),
@@ -1501,15 +1519,93 @@ function exportData(){
     exported:    new Date().toISOString(),
     app:         'masroof-bayti'
   };
-  var json=JSON.stringify(data,null,2);
-  var blob=new Blob([json],{type:'application/json'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;
+  window._exportJson=JSON.stringify(data);
+  // حاول التنزيل أولاً
+  try{
+    var blob=new Blob([window._exportJson],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    var d=new Date();
+    a.download='masroof-bayti-'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'.json';
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },500);
+  }catch(e){}
+  // افتح مودال النسخ دائماً (للتأكد على WebView)
+  openModal('exportModal');
+}
+function renderExportModal(){
+  var json=window._exportJson||'{}';
   var d=new Date();
-  a.download='masroof-bayti-backup-'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'.json';
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);URL.revokeObjectURL(url);
+  var fname='masroof-bayti-'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'.json';
+  return '<div class="overlay-center su" onclick="closeModalBg(event)">'+
+    '<div class="modal-center" style="background:'+TB.hdrBg+';max-width:380px">'+
+    '<div style="text-align:center;margin-bottom:14px">'+
+    '<div style="font-size:40px;margin-bottom:8px">💾</div>'+
+    '<div style="font-weight:900;font-size:16px;color:'+TB.blue+'">نسخة احتياطية</div>'+
+    '<div style="font-size:11px;color:'+TB.textMuted+';margin-top:4px">'+fname+'</div>'+
+    '</div>'+
+    '<div style="background:'+TB.inputBg+';border:1px solid '+TB.border+';border-radius:10px;padding:10px;margin-bottom:12px;max-height:120px;overflow-y:auto">'+
+    '<pre style="font-size:9px;color:'+TB.textMuted+';white-space:pre-wrap;direction:ltr;word-break:break-all;line-height:1.5">'+escHtml(json.slice(0,400)+(json.length>400?'\n...':''))+'</pre>'+
+    '</div>'+
+    '<div style="font-size:11px;color:'+TB.textMuted+';margin-bottom:12px;text-align:center;line-height:1.8">انسخ النص أدناه واحفظه في مكان آمن<br>أو شاركه مع نفسك عبر واتساب</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<button onclick="exportCopyJson()" style="padding:12px 0;background:linear-gradient(135deg,'+TB.blue+','+TB.blueDim+');color:#fff;border:none;border-radius:11px;font-weight:900;font-size:14px">📋 نسخ البيانات كاملاً</button>'+
+    '<button onclick="exportShareWA()" style="padding:12px 0;background:rgba(37,211,102,.1);border:2px solid rgba(37,211,102,.35);color:#25D166;border-radius:11px;font-weight:900;font-size:13px">💬 مشاركة عبر واتساب</button>'+
+    '<button onclick="closeModal()" style="padding:11px 0;background:'+TB.cardBg2+';color:'+TB.textMuted+';border:1px solid '+TB.border2+';border-radius:11px;font-weight:700">إغلاق</button>'+
+    '</div></div></div>';
+}
+function exportCopyJson(){
+  var json=window._exportJson||'{}';
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(json).then(function(){
+      var btn=document.querySelector('#modal-layer button');
+      // find copy btn
+    });
+  } else {
+    var t=document.createElement('textarea');t.value=json;
+    document.body.appendChild(t);t.select();document.execCommand('copy');
+    document.body.removeChild(t);
+  }
+  alert('✅ تم نسخ البيانات!\nألصقها في ملف نصي واحفظه.');
+}
+function exportShareWA(){
+  var json=window._exportJson||'{}';
+  var text='نسخة احتياطية — مصروف البيت\n'+new Date().toLocaleDateString('ar')+
+    '\n\n[البيانات — ألصقها في التطبيق عند الاستعادة]\n'+json.slice(0,500);
+  window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank');
+}
+function renderImportModal(){
+  return '<div class="overlay-center su" onclick="closeModalBg(event)">'+
+    '<div class="modal-center" style="background:'+TB.hdrBg+';max-width:360px">'+
+    '<div style="text-align:center;margin-bottom:14px">'+
+    '<div style="font-size:40px;margin-bottom:8px">📂</div>'+
+    '<div style="font-weight:900;font-size:16px;color:'+TB.blue+'">استيراد نسخة احتياطية</div>'+
+    '</div>'+
+    '<div style="font-size:12px;color:'+TB.textMuted+';margin-bottom:12px;line-height:1.8;text-align:center">اختر ملف JSON من جهازك<br>أو الصق النص أدناه</div>'+
+    '<textarea id="import-text-inp" class="inp" rows="5" placeholder="الصق نص JSON هنا..." style="resize:none;margin-bottom:10px;font-size:11px;direction:ltr"></textarea>'+
+    '<div style="display:flex;flex-direction:column;gap:8px">'+
+    '<button onclick="importFromText()" style="padding:12px 0;background:linear-gradient(135deg,'+TB.blue+','+TB.blueDim+');color:#fff;border:none;border-radius:11px;font-weight:900;font-size:14px">📥 استيراد من النص</button>'+
+    '<button onclick="document.getElementById(&quot;imp-file&quot;).click()" style="padding:12px 0;background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.25);color:'+TB.blue+';border-radius:11px;font-weight:700;font-size:13px">📁 اختر ملف JSON</button>'+
+    '<button onclick="closeModal()" style="padding:11px 0;background:'+TB.cardBg2+';color:'+TB.textMuted+';border:1px solid '+TB.border2+';border-radius:11px;font-weight:700">إلغاء</button>'+
+    '</div></div></div>';
+}
+function importFromText(){
+  var txt=((document.getElementById('import-text-inp')||{}).value||'').trim();
+  if(!txt){alert('الرجاء لصق النص أولاً');return;}
+  try{
+    var data=JSON.parse(txt);
+    if(!data||data.app!=='masroof-bayti'){alert('البيانات غير صالحة!');return;}
+    var keys=['hb_expenses','hb_rates','hb_income','hb_spender','hb_debts','hb_rate_ts','hb_sticky'];
+    keys.forEach(function(k){if(data[k]!=null)lsSet(k,data[k]);});
+    alert('✅ تم استيراد البيانات!\nسيتم إعادة تحميل التطبيق.');
+    location.reload();
+  }catch(ex){alert('❌ خطأ: '+ex.message);}
 }
 function importData(input){
   var file=input.files&&input.files[0];
@@ -1837,9 +1933,6 @@ function createCodesBlob(cb){
 ══════════════════════════════════════ */
 function getLicenseStatus(){
   var uid=getOrCreateUID();
-  var regRaw=lsGet('hb_reg_date');
-  if(!regRaw){var now=Date.now();lsSet('hb_reg_date',now.toString());regRaw=now.toString();}
-  var regDate=parseInt(regRaw);
 
   // كود مفعّل محفوظ محلياً؟
   var savedNonce=lsGet('hb_act_nonce')||'';
@@ -1854,13 +1947,20 @@ function getLicenseStatus(){
     lsSet('hb_act_nonce','');lsSet('hb_act_days','0');lsSet('hb_act_date','0');
     return {status:'expired',uid:uid};
   }
-
-  // فترة التجربة
-  var trialUsed=Math.floor((Date.now()-regDate)/86400000);
-  if(trialUsed<TRIAL_DAYS){
-    return {status:'trial',uid:uid,daysLeft:TRIAL_DAYS-trialUsed};
-  }
+  // بدون كود — يحتاج تفعيل
   return {status:'expired',uid:uid};
+}
+
+// عداد طلبات الكود
+function getRequestCount(){return parseInt(lsGet('hb_req_count')||'0');}
+function incRequestCount(){var c=getRequestCount()+1;lsSet('hb_req_count',String(c));return c;}
+function requestCodeOnWA(){
+  var uid=getOrCreateUID();
+  var count=incRequestCount();
+  var ordinals=['الأولى','الثانية','الثالثة','الرابعة','الخامسة'];
+  var ord=ordinals[count-1]||'رقم '+count;
+  var msg='مرحباً 👋\nأريد الحصول على كود تفعيل تطبيق مصروف البيت\nهذه المرة '+ord+'\nمعرّفي: '+uid;
+  window.open('https://wa.me/'+WA_NUM+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 /* إدخال الكود من قِبل المستخدم */
@@ -1938,22 +2038,27 @@ function _activateLocally(uid,parsed,raw,errEl,btnEl,offline){
 
 /* شاشة انتهاء المدة */
 function renderExpiredScreen(){
-  var uid=getOrCreateUID();
-  return '<div id="access-code-screen" style="position:fixed;inset:0;background:'+TB.appBg+';z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;text-align:center">'+
-    '<div style="font-size:60px;margin-bottom:14px">🔑</div>'+
-    '<div style="font-weight:900;font-size:20px;color:'+TB.blue+';margin-bottom:6px">مصروف البيت</div>'+
-    '<div style="font-weight:700;font-size:14px;color:'+TB.text+';margin-bottom:10px">تواصل مع المطور للحصول على كود التفعيل</div>'+
-    '<div style="font-size:12px;color:'+TB.textMuted+';margin-bottom:18px;line-height:1.8">بياناتك وتسجيلاتك محفوظة بأمان ✅</div>'+
-    '<input id="access-code-inp" class="inp" placeholder="أدخل كود التفعيل  XXXX-XXXX-XXXX" '+
-    'style="text-align:center;font-size:16px;font-weight:900;letter-spacing:2px;direction:ltr;max-width:300px;margin-bottom:6px"/>'+
-    '<div id="code-err" style="display:none;font-size:12px;margin-bottom:10px;font-weight:700"></div>'+
+  var savedNonce=lsGet('hb_act_nonce')||'';
+  var isRenew=savedNonce===''&&getRequestCount()>0;// سبق أن طلب كوداً
+  var hasOldData=Object.keys(STATE.expenses||{}).some(function(k){return (STATE.expenses[k]||[]).length>0;});
+  return '<div id="access-code-screen" style="position:fixed;inset:0;background:'+TB.appBg+';z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;overflow-y:auto">'+
+    '<div style="max-width:340px;width:100%">'+
+    '<div id="lock-tap" onclick="lockTap()" style="font-size:56px;margin-bottom:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none">🔑</div>'+
+    '<div style="font-weight:900;font-size:22px;color:'+TB.blue+';margin-bottom:4px">مصروف البيت</div>'+
+    '<div style="font-weight:700;font-size:15px;color:'+TB.text+';margin-bottom:8px">يتطلب كود تفعيل للدخول</div>'+
+    (hasOldData?'<div style="font-size:12px;color:#4ADE80;background:rgba(74,222,128,.1);border-radius:9px;padding:7px 14px;margin-bottom:14px">✅ بياناتك محفوظة بأمان</div>':'')+
+    '<input id="access-code-inp" class="inp" placeholder="XXXX-XXXX-XXXX" '+
+    'style="text-align:center;font-size:18px;font-weight:900;letter-spacing:3px;direction:ltr;margin-bottom:8px"/>'+
+    '<div id="code-err" style="display:none;font-size:12px;margin-bottom:8px;font-weight:700"></div>'+
     '<button id="act-btn" onclick="submitAccessCode()" '+
-    'style="padding:14px 48px;background:linear-gradient(135deg,'+TB.blue+','+TB.blueDim+');color:#fff;border:none;border-radius:13px;font-weight:900;font-size:16px;margin-bottom:16px">'+
-    'تفعيل ✓</button>'+
-    '<a href="https://wa.me/963968688718" target="_blank" '+
-    'style="display:flex;align-items:center;gap:8px;padding:13px 28px;background:rgba(37,211,102,.1);border:2px solid rgba(37,211,102,.35);border-radius:13px;color:#25D166;font-weight:700;font-size:14px;text-decoration:none">'+
-    '💬 تواصل مع المطور عبر واتساب</a>'+
-    '</div>';
+    'style="width:100%;padding:14px 0;background:linear-gradient(135deg,'+TB.blue+','+TB.blueDim+');color:#fff;border:none;border-radius:13px;font-weight:900;font-size:16px;margin-bottom:14px">'+
+    '✓ تفعيل الكود</button>'+
+    '<div style="font-size:12px;color:'+TB.textMuted+';margin-bottom:10px">ليس لديك كود؟</div>'+
+    '<button onclick="requestCodeOnWA()" '+
+    'style="width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 0;background:rgba(37,211,102,.12);border:2px solid rgba(37,211,102,.4);border-radius:13px;color:#25D166;font-weight:900;font-size:15px;cursor:pointer">'+
+    '<span style="font-size:22px">💬</span><span>اطلب كود التفعيل عبر واتساب</span></button>'+
+    '<div style="font-size:10px;color:'+TB.textFaint+';margin-top:10px">سيتم التواصل مع المطور مباشرة</div>'+
+    '</div></div>';
 }
 
 /* ══════════════════════════════════════
@@ -1965,6 +2070,19 @@ function adminTap(){
   if(_adminTimer)clearTimeout(_adminTimer);
   _adminTimer=setTimeout(function(){_adminTaps=0;},2000);
   if(_adminTaps>=5){_adminTaps=0;clearTimeout(_adminTimer);openModal('adminLogin');}
+}
+// نفس الوظيفة لكن من شاشة الكود (الأيقونة 🔑)
+var _lockTaps=0,_lockTimer=null;
+function lockTap(){
+  _lockTaps++;
+  if(_lockTimer)clearTimeout(_lockTimer);
+  _lockTimer=setTimeout(function(){_lockTaps=0;},2500);
+  if(_lockTaps>=5){
+    _lockTaps=0;clearTimeout(_lockTimer);
+    // فتح لوحة الأدمن مباشرة من شاشة الكود
+    STATE._adminAuth=false;
+    openModal('adminLogin');
+  }
 }
 function copyUID(){
   var uid=getOrCreateUID();
@@ -2488,8 +2606,8 @@ function renderDrawer(){
   html+='<div style="font-weight:900;font-size:13px;color:#4ADE80">النسخ الاحتياطي</div>';
   html+='</div>';
   html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">';
-  html+='<button onclick="exportData()" style="padding:11px 0;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.35);color:#4ADE80;border-radius:10px;font-weight:700;font-size:12px">💾 تصدير</button>';
-  html+='<button onclick="document.getElementById(\'imp-file\').click()" style="padding:11px 0;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.35);color:'+TB.blue+';border-radius:10px;font-weight:700;font-size:12px">📂 استيراد</button>';
+  html+='<button onclick="exportData();closeDrawer()" style="padding:11px 0;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.35);color:#4ADE80;border-radius:10px;font-weight:700;font-size:12px">💾 تصدير</button>';
+  html+='<button onclick="openModal(\'importModal\');closeDrawer()" style="padding:11px 0;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.35);color:'+TB.blue+';border-radius:10px;font-weight:700;font-size:12px">📂 استيراد</button>';
   html+='</div></div>';
 
   // ─ قسم معرف المستخدم ─
@@ -2896,10 +3014,9 @@ function _loadState(){
   setTimeout(autoSyncInit, 5000);// مزامنة اختيارية
   if(!sprRaw){STATE.modal='setup';render();return;}
 
-  // فحص ترخيص التجربة المجانية
+  // فحص الترخيص — يجب كود للدخول
   var lic=getLicenseStatus();
   if(lic.status==='expired'){
-    // انتهت التجربة — اعرض شاشة التفعيل (البيانات سليمة)
     render();
     setTimeout(function(){
       document.getElementById('app').innerHTML=renderExpiredScreen();
