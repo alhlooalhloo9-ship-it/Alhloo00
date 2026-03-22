@@ -167,7 +167,7 @@ function safeMath(raw){
   try{var r=E();return isFinite(r)?parseFloat(r.toFixed(10)):null;}catch(e){return null;}
 }
 
-var _IDB=null,_IDB_KEYS=['hb_expenses','hb_rates','hb_sticky','hb_spender','hb_rate_ts','hb_income','hb_debts','hb_sync_id','hb_sync_code','hb_dhikr_ts','hb_dhikr_idx','hb_uid','hb_auto_blob'];
+var _IDB=null,_IDB_KEYS=['hb_expenses','hb_rates','hb_sticky','hb_spender','hb_rate_ts','hb_income','hb_debts','hb_sync_id','hb_sync_code','hb_dhikr_ts','hb_dhikr_idx','hb_uid','hb_auto_blob','hb_act_nonce','hb_act_days','hb_act_date'];
 function _openIDB(cb){
   if(_IDB){cb(_IDB);return;}
   try{
@@ -221,44 +221,65 @@ function lsSet(key,val){
 function _registerSW(){
   if(!('serviceWorker' in navigator))return;
   var appUrl=location.href.split('?')[0].split('#')[0];
-  // حفظ الصفحة في Cache API مباشرة
+  var CACHE='masroof-v4';
+
+  // حفظ فوري في Cache عند أول فتح
   if('caches' in window){
-    caches.open('masroof-bayti-v3').then(function(c){
-      c.match(appUrl).then(function(r){
-        if(!r)c.add(appUrl).catch(function(){});
-      });
+    caches.open(CACHE).then(function(c){
+      c.add(appUrl).catch(function(){});
     }).catch(function(){});
   }
-  // تسجيل SW من blob
+
   try{
+    // Service Worker: Cache-First (يفتح بدون نت دائماً)
     var swCode=[
-      'var C="masroof-v3",U="'+appUrl+'";',
+      'var C="masroof-v4";',
+      'var U="'+appUrl+'";',
       'self.addEventListener("install",function(e){',
-      '  e.waitUntil(caches.open(C).then(function(c){return c.add(U).catch(function(){});}));',
       '  self.skipWaiting();',
+      '  e.waitUntil(caches.open(C).then(function(c){',
+      '    return c.add(U).catch(function(){});',
+      '  }));',
       '});',
       'self.addEventListener("activate",function(e){',
-      '  e.waitUntil(caches.keys().then(function(ks){',
-      '    return Promise.all(ks.filter(function(k){return k!==C;}).map(function(k){return caches.delete(k);}));',
+      '  e.waitUntil(caches.keys().then(function(keys){',
+      '    return Promise.all(keys.filter(function(k){return k!==C;}).map(function(k){return caches.delete(k);}));',
       '  }));',
-      '  self.clients.claim();',
+      '  return self.clients.claim();',
       '});',
       'self.addEventListener("fetch",function(e){',
-      '  if(e.request.mode==="navigate"||e.request.url===U){',
-      '    e.respondWith(caches.match(U).then(function(r){return r||fetch(e.request);}));',
-      '    return;',
-      '  }',
-      '  e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));',
+      '  var req=e.request;',
+      '  // Cache-First: إرجاع من الكاش أولاً',
+      '  e.respondWith(',
+      '    caches.match(req).then(function(cached){',
+      '      if(cached) return cached;',
+      '      return fetch(req).then(function(res){',
+      '        if(res&&res.status===200){',
+      '          var clone=res.clone();',
+      '          caches.open(C).then(function(c){c.put(req,clone);});',
+      '        }',
+      '        return res;',
+      '      }).catch(function(){return cached;});',
+      '    })',
+      '  );',
       '});'
     ].join('');
     var blob=new Blob([swCode],{type:'application/javascript'});
     var blobUrl=URL.createObjectURL(blob);
     navigator.serviceWorker.register(blobUrl,{scope:'./'})
-      .then(function(){URL.revokeObjectURL(blobUrl);})
-      .catch(function(){URL.revokeObjectURL(blobUrl);});
+      .then(function(){
+        URL.revokeObjectURL(blobUrl);
+        console.log('SW registered — offline ready');
+      })
+      .catch(function(e){
+        URL.revokeObjectURL(blobUrl);
+      });
   }catch(e){}
 }
-window.addEventListener('load',function(){setTimeout(_registerSW,2000);});
+window.addEventListener('load',function(){
+  // تسجيل SW بعد ثانية
+  setTimeout(_registerSW,1000);
+});
 
 var STATE={
   view:'loading',
@@ -1789,21 +1810,21 @@ function createCodesBlob(cb){
 
 function getLicenseStatus(){
   var uid=getOrCreateUID();
-
-  // كود مفعّل محفوظ محلياً؟
   var savedNonce=lsGet('hb_act_nonce')||'';
   var savedDays=parseInt(lsGet('hb_act_days')||'0');
   var savedActDate=parseInt(lsGet('hb_act_date')||'0');
+
   if(savedNonce&&savedDays>0&&savedActDate>0){
     var daysUsed=Math.floor((Date.now()-savedActDate)/86400000);
     if(daysUsed<savedDays){
+      // ✅ كود فعّال — يفتح دائماً حتى بدون نت
       return {status:'licensed',uid:uid,daysLeft:savedDays-daysUsed,totalDays:savedDays};
     }
-    // انتهت مدة الكود
+    // انتهت مدة الكود — امسحه
     lsSet('hb_act_nonce','');lsSet('hb_act_days','0');lsSet('hb_act_date','0');
     return {status:'expired',uid:uid};
   }
-  // بدون كود — يحتاج تفعيل
+  // لا يوجد كود محفوظ
   return {status:'expired',uid:uid};
 }
 
@@ -1873,9 +1894,15 @@ function submitAccessCode(){
 }
 
 function _activateLocally(uid,parsed,raw,errEl,btnEl,offline){
+  // حفظ الترخيص — مزدوج (localStorage + IndexedDB)
+  var actDate=Date.now();
   lsSet('hb_act_nonce',parsed.nonce);
   lsSet('hb_act_days',String(parsed.days));
-  lsSet('hb_act_date',String(Date.now()));
+  lsSet('hb_act_date',String(actDate));
+  // حفظ احتياطي في IDB
+  idbSet('hb_act_nonce',parsed.nonce);
+  idbSet('hb_act_days',String(parsed.days));
+  idbSet('hb_act_date',String(actDate));
   var scr=document.getElementById('access-code-screen');
   if(scr){
     scr.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;background:'+TB.appBg+'">'+
@@ -2842,12 +2869,15 @@ function _loadState(){
   setTimeout(autoSyncInit, 5000);// مزامنة اختيارية
   if(!sprRaw){STATE.modal='setup';render();return;}
 
-  // فحص الترخيص — يجب كود للدخول
+  // فحص الترخيص — محلي 100% بدون نت
   var lic=getLicenseStatus();
   if(lic.status==='expired'){
+    // إذا كان مسجلاً (sprRaw موجود) لكن منتهي الكود
+    // نفتح التطبيق أولاً ثم نعرض شاشة التفعيل فوق
     render();
     setTimeout(function(){
-      document.getElementById('app').innerHTML=renderExpiredScreen();
+      var app=document.getElementById('app');
+      if(app)app.innerHTML=renderExpiredScreen();
     },50);
     return;
   }
