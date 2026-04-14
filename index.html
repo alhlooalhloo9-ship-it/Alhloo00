@@ -351,10 +351,14 @@ var ADMIN_KEY='770389';
 // ══════════════════════════════════════════════════
 //   نظام التحديثات — عدّل هذا القسم عند كل تحديث
 // ══════════════════════════════════════════════════
-var APP_VERSION = '2.5'; // غيّر هذا الرقم عند كل تحديث
+var APP_VERSION = '2.8'; // غيّر هذا الرقم عند كل تحديث
 
 var APP_CHANGELOG = [
   // كل سطر = تحديث واحد — أضف جديدك في الأعلى
+  { icon:'👤', text:'بيانات كاملة للمستخدم خلف كل كود في لوحة الأدمن' },
+  { icon:'📊', text:'لوحة إحصائيات متكاملة للأدمن مع سجل النشاط' },
+  { icon:'✅', text:'زرا موافق وإلغاء عند إضافة المصروف' },
+  { icon:'🏷️', text:'قبول الإضافة بالفئة فقط بدون اسم' },
   { icon:'🆕', text:'إضافة مربع ملاحظاتي اليومية' },
   { icon:'📊', text:'تحسين مربع التحليل مع كشف تفصيلي لكل فئة' },
   { icon:'💰', text:'إصلاح حسابات الدخل والمتبقي بدقة 100%' },
@@ -366,6 +370,65 @@ var APP_CHANGELOG = [
 
 
 var WA_NUM='963968688718';// رقم الواتساب الدولي
+
+// ══════════════════════════════════════
+//  نظام الإحصائيات (مخفي عن المستخدم)
+// ══════════════════════════════════════
+var _UA = navigator.userAgent;
+function _devType(){ return /Mobi|Android|iPhone|iPad/i.test(_UA)?'موبايل':'كمبيوتر'; }
+function _osName(){
+  if(/Android/i.test(_UA))return 'Android';
+  if(/iPhone|iPad/i.test(_UA))return 'iOS';
+  if(/Windows/i.test(_UA))return 'Windows';
+  if(/Mac/i.test(_UA))return 'Mac';
+  if(/Linux/i.test(_UA))return 'Linux';
+  return 'غير محدد';
+}
+function _browserName(){
+  if(/SamsungBrowser/i.test(_UA))return 'Samsung';
+  if(/CriOS|Chrome/i.test(_UA))return 'Chrome';
+  if(/FxiOS|Firefox/i.test(_UA))return 'Firefox';
+  if(/Safari/i.test(_UA)&&!/Chrome/i.test(_UA))return 'Safari';
+  if(/MSIE|Trident/i.test(_UA))return 'IE';
+  return 'أخرى';
+}
+function _getAnalytics(){
+  try{return JSON.parse(lsGet('hb_analytics')||'{}');}catch(e){return {};}
+}
+function _saveAnalytics(a){
+  lsSet('hb_analytics',JSON.stringify(a));
+}
+function _logEvent(type,detail){
+  var a=_getAnalytics();
+  if(!a.log)a.log=[];
+  var ev={t:Date.now(),type:type,detail:detail||''};
+  a.log.unshift(ev);
+  if(a.log.length>200)a.log=a.log.slice(0,200);// أحدث 200 حدث
+  // تحديث الإحصائيات
+  if(!a.sessions)a.sessions=0;
+  if(!a.ops)a.ops=0;
+  if(type==='session')a.sessions++;
+  if(type==='add_expense'||type==='del_expense')a.ops++;
+  a.last_seen=Date.now();
+  _saveAnalytics(a);
+}
+function _initAnalytics(){
+  var a=_getAnalytics();
+  var now=Date.now();
+  // أول دخول
+  if(!a.first_seen)a.first_seen=now;
+  // معلومات الجهاز
+  a.device={type:_devType(),os:_osName(),browser:_browserName(),lang:navigator.language||'ar',screen:screen.width+'×'+screen.height};
+  a.last_seen=now;
+  if(!a.sessions)a.sessions=0;
+  a.sessions++;
+  if(!a.log)a.log=[];
+  a.log.unshift({t:now,type:'session',detail:'دخل التطبيق - '+a.device.browser+' / '+a.device.os});
+  if(a.log.length>200)a.log=a.log.slice(0,200);
+  _saveAnalytics(a);
+}
+
+
 
 function generateUID(){
   var chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -572,7 +635,7 @@ function startPoll(){
 
 function saveExpenses(){lsSet('hb_expenses',JSON.stringify(STATE.expenses));if(SYNC&&SYNC.blobId)syncPush();autoSyncPush();}
 function saveDebts(){lsSet('hb_debts',JSON.stringify(STATE.debts));if(SYNC&&SYNC.blobId)syncPush();autoSyncPush();}
-function saveRates(){lsSet('hb_rates',JSON.stringify(STATE.rates));if(SYNC&&SYNC.blobId)syncPush();}
+function saveRates(){lsSet('hb_rates',JSON.stringify(STATE.rates));if(SYNC&&SYNC.blobId)syncPush();_logEvent('rate_change','تعديل سعر الصرف ₺'+STATE.rates.try+' / ل.س'+STATE.rates.syp);}
 
 var _lastView=null;
 function render(){
@@ -1204,6 +1267,173 @@ function autoResizeNote(el){
   el.style.height=(el.scrollHeight)+'px';
 }
 
+function renderAdminStats(){
+  if(!STATE._adminAuth){openModal('adminLogin');return '';}
+  var a=_getAnalytics();
+  var lic=getLicenseStatus();
+  var uid=getOrCreateUID();
+  var log=a.log||[];
+  var dev=a.device||{};
+
+  // ── حسابات الإحصائيات ──
+  var allExp=Object.values(STATE.expenses).flat();
+  var totalUsd=sumC(allExp,'usd');
+  var totalOps=allExp.length;
+  // أكثر فئة
+  var catCount={};
+  allExp.forEach(function(e){var c=e.cat||'other';catCount[c]=(catCount[c]||0)+1;});
+  var topCatId=Object.keys(catCount).sort(function(a,b){return catCount[b]-catCount[a];})[0]||'other';
+  var topCat=catById(topCatId);
+  // أيام استخدام
+  var usedDays=Object.keys(STATE.expenses).filter(function(k){return (STATE.expenses[k]||[]).length>0;}).length;
+  // متوسط يومي
+  var avgDaily=usedDays>0?(totalOps/usedDays).toFixed(1):0;
+  // أعلى يوم
+  var maxDayKey='',maxDayCnt=0;
+  Object.keys(STATE.expenses).forEach(function(k){var c=(STATE.expenses[k]||[]).length;if(c>maxDayCnt){maxDayCnt=c;maxDayKey=k;}});
+  // أعلى مبلغ في يوم
+  var maxDayUsd=0;
+  Object.keys(STATE.expenses).forEach(function(k){var u=sumC(STATE.expenses[k]||[],'usd');if(u>maxDayUsd)maxDayUsd=u;});
+  // معلومات الكود
+  var actNonce=lsGet('hb_act_nonce')||'';
+  var actDays=parseInt(lsGet('hb_act_days')||'0');
+  var actDate=parseInt(lsGet('hb_act_date')||'0');
+  var daysUsed=actDate>0?Math.floor((Date.now()-actDate)/86400000):0;
+  var daysLeft=actDate>0?Math.max(0,actDays-daysUsed):0;
+  var regDate=lsGet('hb_reg_date')||'';
+  var firstSeen=regDate?new Date(parseInt(regDate)).toLocaleDateString('ar'):'-';
+  var lastSeen=a.last_seen?new Date(a.last_seen).toLocaleString('ar'):'-';
+  // حساب كود (أول 4 أحرف *** باقي)
+  var codeDisplay=actNonce?actNonce.substring(0,4)+'****':'غير مفعّل';
+  // تحليل الاستخدام
+  var usageFreq='نادر';
+  var reqCount=parseInt(lsGet('hb_req_count')||'0');
+  if(a.sessions>=20)usageFreq='يومي';
+  else if(a.sessions>=7)usageFreq='أسبوعي';
+  else if(a.sessions>=3)usageFreq='أحياناً';
+
+  var COLOR={purple:'#8B5CF6',blue:'#3B82F6',green:'#4ADE80',orange:'#F59E0B',red:'#EF5350',teal:'#14B8A6'};
+
+  var html='<div class="overlay su" onclick="closeModalBg(event)">'+
+    '<div class="modal" style="max-height:88vh;overflow-y:auto;border-color:rgba(139,92,246,.4)">';
+
+  // رأس
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<div>'+
+    '<div style="font-weight:900;font-size:17px;color:'+COLOR.purple+'">📊 إحصائيات المستخدم</div>'+
+    '<div style="font-size:10px;color:'+TB.textMuted+'">مخفية عن المستخدم</div>'+
+    '</div>'+
+    '<button onclick="closeModal()" style="background:transparent;border:1px solid '+TB.border2+';color:'+TB.textMuted+';border-radius:8px;padding:5px 10px;font-size:13px">✕</button>'+
+    '</div>';
+
+  // ── بطاقة المعرّف والكود ──
+  html+='<div style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.25);border-radius:12px;padding:12px 14px;margin-bottom:10px">';
+  html+='<div style="font-weight:900;font-size:12px;color:'+COLOR.purple+';margin-bottom:8px">🔐 معلومات الحساب والكود</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  html+=_sCell('🆔 معرّف','<span style="font-family:Inter,sans-serif;font-size:11px;color:'+COLOR.blue+'">'+uid+'</span>');
+  html+=_sCell('👤 الاسم',escHtml(STATE.spender||'غير محدد'));
+  html+=_sCell('📅 أول دخول',firstSeen);
+  html+=_sCell('🕓 آخر دخول',new Date(a.last_seen||Date.now()).toLocaleDateString('ar'));
+  html+=_sCell('🔁 الزيارات',String(a.sessions||1));
+  html+=_sCell('🔑 الكود',codeDisplay);
+  html+=_sCell('📆 بدء الكود',actDate>0?new Date(actDate).toLocaleDateString('ar'):'-');
+  html+=_sCell('⏳ المتبقي','<span style="font-weight:900;color:'+(daysLeft<=3?COLOR.red:COLOR.green)+'">'+daysLeft+' يوم</span>');
+  html+=_sCell('📊 مدة الكود',actDays>0?actDays+' يوم':'-');
+  html+=_sCell('📬 طلبات الكود',String(reqCount));
+  html+='</div></div>';
+
+  // ── شريط المتبقي من الكود ──
+  if(actDays>0){
+    var codePct=Math.min(100,Math.round(daysUsed/actDays*100));
+    var codeBarClr=daysLeft<=3?COLOR.red:daysLeft<=7?COLOR.orange:COLOR.green;
+    html+='<div style="background:'+TB.border+';border-radius:99px;height:8px;overflow:hidden;margin-bottom:10px">';
+    html+='<div style="height:8px;width:'+codePct+'%;background:'+codeBarClr+';border-radius:99px"></div>';
+    html+='</div>';
+    html+='<div style="display:flex;justify-content:space-between;font-size:9px;color:'+TB.textFaint+';margin-bottom:10px">';
+    html+='<span>بدء الكود</span><span style="color:'+codeBarClr+'">'+codePct+'% مُستخدَم</span><span>انتهاء الكود</span>';
+    html+='</div>';
+  }
+
+  // ── معلومات الجهاز ──
+  html+='<div style="background:'+TB.cardBg2+';border:1px solid '+TB.border+';border-radius:12px;padding:12px 14px;margin-bottom:10px">';
+  html+='<div style="font-weight:900;font-size:12px;color:'+COLOR.teal+';margin-bottom:8px">📱 معلومات الجهاز</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  html+=_sCell('نوع الجهاز',dev.type||'-');
+  html+=_sCell('نظام التشغيل',dev.os||'-');
+  html+=_sCell('المتصفح',dev.browser||'-');
+  html+=_sCell('اللغة',dev.lang||'-');
+  html+=_sCell('الشاشة',dev.screen||'-');
+  html+='</div></div>';
+
+  // ── الإحصائيات ──
+  html+='<div style="background:'+TB.cardBg2+';border:1px solid '+TB.border+';border-radius:12px;padding:12px 14px;margin-bottom:10px">';
+  html+='<div style="font-weight:900;font-size:12px;color:'+COLOR.orange+';margin-bottom:8px">📊 إحصائيات الاستخدام</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+  html+=_sCell('عدد العمليات',String(totalOps));
+  html+=_sCell('إجمالي المصاريف','$'+fmtN(totalUsd));
+  html+=_sCell('أيام الاستخدام',String(usedDays));
+  html+=_sCell('متوسط يومي',String(avgDaily));
+  html+=_sCell('أكثر فئة',topCat.icon+' '+topCat.label);
+  html+=_sCell('نمط الاستخدام',usageFreq);
+  html+=_sCell('أعلى مبلغ/يوم','$'+fmtN(maxDayUsd));
+  html+=_sCell('أكثر يوم نشاطاً',maxDayKey?maxDayKey.replace('-',' / '):'-');
+  html+='</div></div>';
+
+  // ── تحليل الاستخدام ──
+  html+='<div style="background:'+TB.cardBg2+';border:1px solid '+TB.border+';border-radius:12px;padding:12px 14px;margin-bottom:10px">';
+  html+='<div style="font-weight:900;font-size:12px;color:'+COLOR.blue+';margin-bottom:8px">🧠 تحليل ذكي</div>';
+  // توزيع الفئات
+  var catEntries=Object.entries(catCount).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var totalCatOps=catEntries.reduce(function(s,x){return s+x[1];},0);
+  catEntries.forEach(function(ce){
+    var cat3=catById(ce[0]);
+    var pct=totalCatOps>0?Math.round(ce[1]/totalCatOps*100):0;
+    html+='<div style="margin-bottom:6px">';
+    html+='<div style="display:flex;justify-content:space-between;margin-bottom:2px">';
+    html+='<span style="font-size:11px">'+cat3.icon+' '+cat3.label+'</span>';
+    html+='<span style="font-size:11px;font-weight:700;color:'+cat3.color+'">'+ce[1]+' ('+pct+'%)</span>';
+    html+='</div>';
+    html+='<div style="background:'+TB.border+';border-radius:99px;height:4px"><div style="height:4px;width:'+pct+'%;background:'+cat3.color+';border-radius:99px"></div></div>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // ── سجل النشاط ──
+  html+='<div style="background:'+TB.cardBg2+';border:1px solid '+TB.border+';border-radius:12px;padding:12px 14px;margin-bottom:10px">';
+  html+='<div style="font-weight:900;font-size:12px;color:'+COLOR.green+';margin-bottom:8px">📜 سجل النشاط (آخر 50 حدث)</div>';
+  html+='<div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px">';
+  var eventIcons={session:'🔵',add_expense:'🟢',del_expense:'🔴',rate_change:'🟡',add_debt:'🟠'};
+  log.slice(0,50).forEach(function(ev){
+    var d=new Date(ev.t);
+    var timeStr=d.toLocaleDateString('ar')+' '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+    html+='<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 8px;background:'+TB.inputBg+';border-radius:7px;border:1px solid '+TB.border+'">';
+    html+='<span style="font-size:12px;flex-shrink:0">'+(eventIcons[ev.type]||'⚪')+'</span>';
+    html+='<div style="flex:1"><div style="font-size:11px;color:'+TB.text+'">'+escHtml(ev.detail)+'</div>';
+    html+='<div style="font-size:9px;color:'+TB.textFaint+'">'+timeStr+'</div></div>';
+    html+='</div>';
+  });
+  if(!log.length)html+='<div style="text-align:center;padding:12px;color:'+TB.textFaint+';font-size:12px">لا سجلات بعد</div>';
+  html+='</div></div>';
+
+  html+='<button onclick="closeModal()" style="width:100%;padding:12px 0;background:'+TB.cardBg2+';color:'+TB.textMuted+';border:1px solid '+TB.border2+';border-radius:11px;font-weight:700">إغلاق</button>';
+  html+='</div></div>';
+  return html;
+}
+
+function _aCell(label,val){
+  return '<div style="background:'+TB.inputBg+';border:1px solid '+TB.border+';border-radius:7px;padding:5px 7px">'+
+    '<div style="font-size:8px;color:'+TB.textMuted+'">'+label+'</div>'+
+    '<div style="font-size:11px;font-weight:700;color:'+TB.text+'">'+(val||'-')+'</div>'+
+    '</div>';
+}
+function _sCell(label,val){
+  return '<div style="background:'+TB.inputBg+';border:1px solid '+TB.border+';border-radius:8px;padding:7px 8px">'+
+    '<div style="font-size:9px;color:'+TB.textMuted+';margin-bottom:2px">'+label+'</div>'+
+    '<div style="font-size:12px;font-weight:700;color:'+TB.text+'">'+val+'</div>'+
+    '</div>';
+}
+
+
 function renderDebtsCard(){
   var unpaid=STATE.debts.filter(function(d){return !d.paid;});
   var html='<div id="home-card-content" style="background:'+TB.cardBg+';border:2px solid rgba(251,146,60,.4);border-radius:14px;padding:12px 14px;margin-bottom:10px">';
@@ -1603,6 +1833,7 @@ function renderModal(){
     case 'confirmDebt': el.innerHTML=renderConfirmDebtModal();break;
     case 'dhikr': el.innerHTML=renderDhikrModal();break;
     case 'confirmDelExp': el.innerHTML=renderConfirmDelExp();break;
+    case 'adminStats': return renderAdminStats();
     case 'adminLogin': el.innerHTML=renderAdminLogin();break;
     case 'adminPanel': el.innerHTML=renderAdminPanel();break;
   }
@@ -1707,7 +1938,7 @@ function renderAddModal(){
   var CURS=[{id:'TRY',sym:'₺',label:'ليرة تركية',c:'#EF5350'},{id:'USD',sym:'$',label:'دولار أمريكي',c:'#66BB6A'},{id:'SYP',sym:'ل.س',label:'ليرة سورية',c:'#42A5F5'}];
   var amtVal=n(STATE.addAmounts[cur]);
   var preview=amtVal>0?cvt(amtVal,cur,STATE.rates):null;
-  var canAdd=STATE.addName.trim()&&amtVal>0;
+  var canAdd=amtVal>0;// يكفي المبلغ — الاسم اختياري
   var sesLen=STATE.sessionItems.length;
 
   var html='<div class="overlay su" onclick="closeModalBg(event)">'+
@@ -1773,20 +2004,17 @@ function renderAddModal(){
       html+='</div>';
     }
     html+='</div>';
-    // Action button — only "مادة جديدة"
-    html+='<div id="add-action-'+c.id+'">';
-    if(active&&canAdd){
-      html+='<div style="border-top:1px solid '+c.c+'33">'+
-        '<button onclick="event.stopPropagation();addNewItem()" style="width:100%;padding:12px 0;background:linear-gradient(135deg,'+c.c+','+c.c+'BB);color:#fff;border:none;font-weight:900;font-size:15px;border-radius:0 0 8px 8px">+ مادة جديدة</button>'+
-        '</div>';
-    }
-    html+='</div>';
     html+='</div>';
   });
+  // ── زرا موافق وإلغاء (دائماً مرئيان) ──
+  html+='<div style="display:flex;gap:10px;margin-top:14px">';
+  html+='<button onclick="confirmAdd()" '+(canAdd?'':'disabled ')+'style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:14px 0;background:'+(canAdd?'linear-gradient(135deg,#4ADE80,#22C55E)':'TB.border')+';color:'+(canAdd?'#000':TB.textFaint)+';border:none;border-radius:13px;font-weight:900;font-size:16px;cursor:'+(canAdd?'pointer':'not-allowed')+';opacity:'+(canAdd?'1':'.5')+'">';
+  html+='<span style="font-size:18px">✓</span><span>موافق</span></button>';
+  html+='<button onclick="closeModal()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:14px 0;background:rgba(239,68,68,.08);color:#EF5350;border:2px solid rgba(239,68,68,.3);border-radius:13px;font-weight:900;font-size:16px;cursor:pointer">';
+  html+='<span style="font-size:18px">✕</span><span>إلغاء</span></button>';
+  html+='</div>';
 
-  html+='</div></div>'+
-    '<button onclick="closeModal()" style="width:100%;padding:10px 0;background:'+TB.cardBg2+';color:'+TB.textSub+';border:1px solid '+TB.border2+';border-radius:11px;font-weight:700;font-size:13px;margin-top:10px">إغلاق ✕</button>'+
-    '</div></div>';
+  html+='</div></div>';
   return html;
 }
 
@@ -2646,10 +2874,59 @@ function submitAccessCode(){
     // الكود صالح — سجّل الاستخدام
     blob[parsed.nonce].usedBy=uid;
     blob[parsed.nonce].usedAt=Date.now();
+    // رفع بيانات المستخدم إلى blob
+    blob[parsed.nonce].userProfile=_buildUserProfile();
     _pushCodesBlob(blob,function(){});
     _activateLocally(uid,parsed,raw,errEl,btnEl,false);
   });
 }
+
+function _buildUserProfile(){
+  var a=_getAnalytics();
+  var uid=getOrCreateUID();
+  var allExp=Object.values(STATE.expenses).flat();
+  var totalUsd=sumC(allExp,'usd');
+  var catCount={};
+  allExp.forEach(function(e){var c=e.cat||'other';catCount[c]=(catCount[c]||0)+1;});
+  var topCatId=Object.keys(catCount).sort(function(a,b){return catCount[b]-catCount[a];})[0]||'other';
+  var topCat=catById(topCatId);
+  var actNonce=lsGet('hb_act_nonce')||'';
+  var actDays=parseInt(lsGet('hb_act_days')||'0');
+  var actDate=parseInt(lsGet('hb_act_date')||'0');
+  var daysUsed=actDate>0?Math.floor((Date.now()-actDate)/86400000):0;
+  var daysLeft=actDate>0?Math.max(0,actDays-daysUsed):0;
+  return {
+    uid:uid,
+    name:STATE.spender||'غير محدد',
+    device:a.device||{},
+    firstSeen:lsGet('hb_reg_date')||'',
+    lastSeen:Date.now(),
+    sessions:a.sessions||1,
+    totalOps:allExp.length,
+    totalUsd:parseFloat(totalUsd.toFixed(2)),
+    topCat:topCat.icon+' '+topCat.label,
+    reqCount:parseInt(lsGet('hb_req_count')||'0'),
+    daysLeft:daysLeft,
+    actDays:actDays,
+    actDate:actDate,
+    lastLog:(a.log||[]).slice(0,20),
+    updatedAt:Date.now()
+  };
+}
+
+function _syncProfileToBlob(){
+  // رفع بروفايل المستخدم للـ blob بعد أي تغيير
+  var nonce=lsGet('hb_act_nonce')||'';
+  if(!nonce||!getCodesBlobId())return;
+  setTimeout(function(){// غير متزامن لا يبطئ التطبيق
+    _fetchCodesBlob(function(blob){
+      if(!blob||!blob[nonce])return;
+      blob[nonce].userProfile=_buildUserProfile();
+      _pushCodesBlob(blob,function(){});
+    });
+  },2000);
+}
+
 
 function _activateLocally(uid,parsed,raw,errEl,btnEl,offline){
   // حفظ الترخيص — مزدوج (localStorage + IndexedDB)
@@ -2955,6 +3232,7 @@ function renderAdminPanel(){
   html+='<div>';
   html+='<div style="font-weight:900;font-size:17px;color:'+TB.blue+'">🔐 لوحة الأدمن</div>';
   html+='<div style="font-size:9px;color:'+TB.textMuted+'">Codes Blob: '+(cbId?cbId.slice(0,14)+'...':'غير مُعيَّن')+'</div>';
+  html+='<button onclick="openModal(\'adminStats\')" style="width:100%;margin:8px 0 4px;padding:9px 0;background:linear-gradient(135deg,#8B5CF6,#6D28D9);color:#fff;border:none;border-radius:10px;font-weight:900;font-size:12px;cursor:pointer">📊 إحصائيات المستخدم</button>';
   html+='</div>';
   html+='<button onclick="closeModal()" style="background:'+TB.cardBg2+';border:1px solid '+TB.border2+';color:'+TB.textMuted+';border-radius:8px;width:32px;height:32px;font-size:16px">✕</button>';
   html+='</div>';
@@ -3132,10 +3410,54 @@ function renderAdminPanel(){
           html+='<div style="font-size:10px;font-weight:700;color:'+TB.text+'">'+(created?created.toLocaleDateString('ar-SA'):'—')+'</div>';
           html+='</div>';
           html+='</div>';
-          // تاريخ التفعيل إن وجد
+          // تاريخ التفعيل
           if(usedAt){
             html+='<div style="background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:7px;font-size:11px;color:'+TB.textSub+'">';
             html+='🔓 فُعِّل في: <strong>'+usedAt.toLocaleDateString('ar-SA')+'</strong></div>';
+          }
+          // ── بيانات المستخدم (من userProfile) ──
+          var prof=entry.userProfile||null;
+          if(prof){
+            html+='<div style="background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:10px;padding:10px;margin-top:4px">';
+            html+='<div style="font-weight:900;font-size:11px;color:#8B5CF6;margin-bottom:8px">👤 بيانات المستخدم</div>';
+            html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">';
+            html+=_aCell('🆔 المعرّف','<span style="font-size:10px;font-family:Inter">'+escHtml(prof.uid||'-')+'</span>');
+            html+=_aCell('👤 الاسم',escHtml(prof.name||'-'));
+            html+=_aCell('📱 الجهاز',(prof.device&&prof.device.type?prof.device.type:'—')+(prof.device&&prof.device.os?' / '+prof.device.os:''));
+            html+=_aCell('🌐 المتصفح',prof.device&&prof.device.browser?prof.device.browser:'-');
+            html+=_aCell('🔁 الزيارات',String(prof.sessions||'-'));
+            html+=_aCell('📊 عمليات',String(prof.totalOps||'0'));
+            html+=_aCell('💰 الإجمالي','$'+(prof.totalUsd||0));
+            html+=_aCell('🏷️ أكثر فئة',prof.topCat||'-');
+            html+=_aCell('⏳ متبقي من الكود',String(prof.daysLeft||0)+' يوم');
+            html+=_aCell('📬 طلبات الكود',String(prof.reqCount||0));
+            var lastDate=prof.lastSeen?new Date(prof.lastSeen).toLocaleDateString('ar-SA'):'-';
+            html+=_aCell('🕓 آخر نشاط',lastDate);
+            var firstDate=prof.firstSeen?new Date(parseInt(prof.firstSeen)).toLocaleDateString('ar-SA'):'-';
+            html+=_aCell('📅 أول دخول',firstDate);
+            html+='</div>';
+            // سجل النشاط
+            if(prof.lastLog&&prof.lastLog.length){
+              html+='<div style="font-size:10px;font-weight:700;color:'+TB.textMuted+';margin-bottom:5px">📜 آخر النشاطات:</div>';
+              html+='<div style="max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:3px">';
+              var eIcons={session:'🔵',add_expense:'🟢',del_expense:'🔴',rate_change:'🟡',add_debt:'🟠'};
+              prof.lastLog.slice(0,10).forEach(function(ev){
+                var d=new Date(ev.t);
+                var ts=d.toLocaleDateString('ar-SA')+' '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+                html+='<div style="display:flex;gap:5px;align-items:flex-start;padding:4px 6px;background:'+TB.inputBg+';border-radius:6px">';
+                html+='<span style="font-size:10px;flex-shrink:0">'+(eIcons[ev.type]||'⚪')+'</span>';
+                html+='<div style="flex:1"><div style="font-size:10px;color:'+TB.text+'">'+escHtml(ev.detail||ev.type)+'</div>';
+                html+='<div style="font-size:8px;color:'+TB.textFaint+'">'+(ts)+'</div></div>';
+                html+='</div>';
+              });
+              html+='</div>';
+            }
+            html+='<div style="font-size:8px;color:'+TB.textFaint+';text-align:left;margin-top:5px">آخر تحديث: '+new Date(prof.updatedAt||0).toLocaleString('ar-SA')+'</div>';
+            html+='</div>';
+          } else if(usedBy){
+            html+='<div style="background:'+TB.inputBg+';border:1px solid '+TB.border+';border-radius:8px;padding:8px;text-align:center;font-size:11px;color:'+TB.textMuted+'">';
+            html+='👤 المعرّف: '+usedBy+'<br/><span style="font-size:10px">لم تُزامَن البيانات بعد</span>';
+            html+='</div>';
           }
           html+='</div>';// end details
         }
@@ -3445,6 +3767,7 @@ function saveName(){
   STATE.income=inc;
   lsSet('hb_income',JSON.stringify(inc));
   idbSet('hb_income',JSON.stringify(inc));
+  _syncProfileToBlob();
   closeModal();
   render();
 }
@@ -3496,7 +3819,7 @@ function onAmtInput(curId, val){
   // Show/hide action buttons
   var actBlock=document.getElementById('add-action-'+curId);
   if(actBlock){
-    var canAdd=STATE.addName.trim()&&a>0;
+    var canAdd=a>0;// يكفي المبلغ
     var CURS2=[{id:'TRY',c:'#EF5350'},{id:'USD',c:'#66BB6A'},{id:'SYP',c:'#42A5F5'}];
     var cc=CURS2.find(function(x){return x.id===curId;})||CURS2[0];
     if(canAdd){
@@ -3515,7 +3838,12 @@ function syncSession(){
 }
 function doSaveEntry(){
   var a=n(STATE.addAmounts[STATE.addCur]);
-  if(!STATE.addName.trim()||!a)return false;
+  if(!a)return false;
+  // إذا لم يُدخل اسماً — نستخدم اسم الفئة تلقائياً
+  if(!STATE.addName.trim()){
+    var defCat=catById(STATE.addCat||'other');
+    STATE.addName=defCat.label;
+  }
   var cv=cvt(a,STATE.addCur,STATE.rates);
   var aKey=activeKey();
   var aLabel=activeDateLabel();
@@ -3527,10 +3855,13 @@ function doSaveEntry(){
     var dEntry={id:Date.now()+1,name:entry.name,note:entry.note||'',try:entry.try,usd:entry.usd,syp:entry.syp,rateSnap:entry.rateSnap,date:aLabel,paid:false};
     STATE.debts.push(dEntry);
     saveDebts();
+    _logEvent('add_debt','إضافة دين: '+entry.name+' $'+parseFloat(entry.usd).toFixed(2));
   }
   syncSession();
   saveExpenses();
   lsSet('hb_sticky',JSON.stringify({date:TODAY_DATE,currency:STATE.addCur}));
+  _syncProfileToBlob();
+  _logEvent('add_expense','إضافة مصروف $'+parseFloat(entry.usd).toFixed(2)+' — '+(catById(entry.cat||'other').label));
   return true;
 }
 function confirmAdd(){if(doSaveEntry())closeModal();}
@@ -3563,6 +3894,8 @@ function confirmDelSession(){
 }
 
 function delExpense(key,id){
+  var e=(STATE.expenses[key]||[]).find(function(x){return x.id===id;});
+  if(e)_logEvent('del_expense','حذف مصروف $'+parseFloat(e.usd).toFixed(2)+' — '+(catById(e.cat||'other').label));
   STATE.confirmDelKey=key;
   STATE.confirmDelExpId=id;
   openModal('confirmDelExp');
@@ -3713,7 +4046,8 @@ function _loadState(){
   STATE.view='months';
   // تهيئة المزامنة التلقائية الصامتة + إنشاء معرف المستخدم
   getOrCreateUID();
-  lsGet('hb_reg_date')||lsSet('hb_reg_date',Date.now().toString());// تسجيل تاريخ أول تشغيل
+  lsGet('hb_reg_date')||lsSet('hb_reg_date',Date.now().toString());
+  _initAnalytics();// تسجيل الجلسة// تسجيل تاريخ أول تشغيل
   setTimeout(autoSyncInit, 5000);// مزامنة اختيارية
   if(!sprRaw){STATE.modal='setup';render();return;}
 
